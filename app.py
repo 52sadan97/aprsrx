@@ -177,12 +177,13 @@ def api_history():
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         
-        # Son 1 aylık lokasyonları çek (Zamansal sıralı)
-        c.execute("SELECT callsign, lat, lon, timestamp FROM location_history ORDER BY timestamp ASC")
+        # Son 21 saatlik verileri çek (Sayfanın hızlı yüklenmesi için)
+        twenty_one_hours_ago = time.time() - (21 * 60 * 60)
+        
+        c.execute("SELECT callsign, lat, lon, timestamp FROM location_history WHERE timestamp > ? ORDER BY timestamp ASC", (twenty_one_hours_ago,))
         locations = [dict(row) for row in c.fetchall()]
         
-        # Son 1 aylık mesajları çek
-        c.execute("SELECT sender, receiver, message_text, timestamp FROM message_history ORDER BY timestamp ASC")
+        c.execute("SELECT sender, receiver, message_text, timestamp FROM message_history WHERE timestamp > ? ORDER BY timestamp ASC", (twenty_one_hours_ago,))
         messages = [dict(row) for row in c.fetchall()]
         
         conn.close()
