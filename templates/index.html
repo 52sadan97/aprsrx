@@ -274,10 +274,10 @@
         }
         
         // --- 2. MESAJLAŞMA İŞLEMLERİ ---
-        // APRS paket formatı { format: "message", messageText: "...", addresse: "..." }
+        // APRS paket formatı { format: "message", message_text: "...", addresse: "..." }
         if (packet.format === 'message') {
             const receiver = (packet.addresse || "").trim();
-            const text = (packet.messageText || "").trim();
+            const text = (packet.message_text || "").trim();
             appendMessage(callsign, receiver, text, false);
         }
     });
