@@ -71,7 +71,7 @@ def aprs_listener():
                 
                 KORGAN_LAT = 40.8000
                 KORGAN_LON = 37.3000
-                RADIUS_KM = 20.0
+                RADIUS_KM = 5.0
                 
                 dist = haversine_distance(lat, lon, KORGAN_LAT, KORGAN_LON)
                 
