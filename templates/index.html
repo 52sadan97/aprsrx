@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="tr" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APRSRX - Canlı Radar & Mesajlaşma</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            background-color: #121212;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+        .navbar {
+            background: linear-gradient(90deg, #1e1e1e 0%, #2d2d2d 100%);
+            border-bottom: 1px solid #333;
+            z-index: 1000;
+        }
+        .navbar-brand {
+            color: #0dcaf0 !important;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        #map {
+            height: calc(100vh - 56px); /* Navbar height subtracted */
+            width: 100%;
+            z-index: 1;
+        }
+        #sidebar {
+            height: calc(100vh - 56px);
+            background-color: #1e1e1e;
+            border-left: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            background-color: #252526;
+            padding: 15px;
+            border-bottom: 1px solid #333;
+            font-weight: bold;
+        }
+        .chat-messages {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .message-box {
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 0.9rem;
+            position: relative;
+        }
+        .message-box.self {
+            background-color: #0d6efd;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 0;
+        }
+        .message-box.other {
+            background-color: #333;
+            align-self: flex-start;
+            border-bottom-left-radius: 0;
+            border-left: 3px solid #0dcaf0;
+        }
+        .message-header {
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .message-box.self .message-header {
+            color: #ddd;
+        }
+        .chat-input-area {
+            padding: 15px;
+            background-color: #252526;
+            border-top: 1px solid #333;
+        }
+        .form-control {
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            color: #fff;
+        }
+        .form-control:focus {
+            background-color: #333;
+            border-color: #0dcaf0;
+            color: #fff;
+            box-shadow: none;
+        }
+        .btn-info {
+            background-color: #0dcaf0;
+            border-color: #0dcaf0;
+            color: #000;
+        }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+        }
+        .btn-chat-target {
+            cursor: pointer;
+            color: #0dcaf0;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#"><i class="fa-solid fa-radar"></i> APRSRX Canlı Harita</a>
+        <span class="text-muted"><i class="fa-solid fa-circle text-success ms-3 me-1 blink"></i> Canlı Dinleniyor...</span>
+    </div>
+</nav>
+
+<div class="container-fluid p-0">
+    <div class="row g-0">
+        <!-- Harita Alanı -->
+        <div class="col-md-8 col-lg-9">
+            <div id="map"></div>
+        </div>
+        
+        <!-- Mesajlaşma Yan Paneli -->
+        <div class="col-md-4 col-lg-3" id="sidebar">
+            <div class="chat-header d-flex justify-content-between align-items-center">
+                <span><i class="fa-solid fa-comments text-info"></i> Telsiz Mesajları</span>
+                <span class="badge bg-secondary" id="target-badge">Genel İzleme</span>
+            </div>
+            
+            <div class="chat-messages" id="chat-messages">
+                <div class="text-center text-muted mt-3 small">
+                    <i class="fa-solid fa-satellite-dish mb-2" style="font-size: 24px;"></i><br>
+                    APRS-IS Ağı Dinleniyor...<br>Henüz mesaj yok.
+                </div>
+            </div>
+            
+            <div class="chat-input-area">
+                <form id="message-form" class="d-flex flex-column gap-2">
+                    <input type="text" id="target-input" class="form-control form-control-sm" placeholder="Hedef Çağrı İşareti (Örn: TA7KES-1)">
+                    <div class="input-group">
+                        <input type="text" id="message-input" class="form-control" placeholder="Mesajınızı yazın..." required>
+                        <button class="btn btn-info" type="submit"><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Socket.IO -->
+<script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // Haritayı Başlat (Varsayılan Merkez: Ordu/Korgan civarı)
+    const map = L.map('map', {
+        zoomControl: false // Sağ alta alacağız
+    }).setView([40.8, 37.3], 9);
+
+    // Zoom kontrolünü sağ alta al
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // Koyu Tema Harita Katmanı (CartoDB Dark Matter)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 19
+    }).addTo(map);
+
+    // Cihazları ve yollarını (izlerini) tutacağımız objeler
+    const markers = {};
+    const tracks = {};
+    
+    // Mesajlar için Socket.IO Bağlantısı
+    const socket = io();
+    const chatContainer = document.getElementById('chat-messages');
+    
+    function setTarget(callsign) {
+        document.getElementById('target-input').value = callsign;
+        document.getElementById('target-badge').innerText = callsign;
+        document.getElementById('message-input').focus();
+    }
+    
+    function appendMessage(sender, receiver, text, isSelf=false) {
+        // Remove initial placeholder if exists
+        const placeholder = chatContainer.querySelector('.text-center');
+        if (placeholder) placeholder.remove();
+        
+        const time = new Date().toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'});
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message-box ${isSelf ? 'self' : 'other'}`;
+        
+        msgDiv.innerHTML = `
+            <div class="message-header">
+                <strong class="${!isSelf ? 'btn-chat-target' : ''}" onclick="${!isSelf ? `setTarget('${sender}')` : ''}">${sender}</strong>
+                <span>${time}</span>
+            </div>
+            <div>${text}</div>
+            ${!isSelf && receiver ? `<div style="font-size: 0.7rem; color: #888; text-align: right; margin-top: 4px;">Hedef: ${receiver}</div>` : ''}
+        `;
+        
+        chatContainer.appendChild(msgDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    socket.on('connect', () => {
+        console.log("Sunucuya bağlanıldı!");
+    });
+
+    socket.on('aprs_packet', (packet) => {
+        // Konsolda görmek isterseniz açabilirsiniz
+        // console.log(packet);
+        
+        const callsign = packet.from;
+        
+        // --- 1. HARİTA (KONUM) İŞLEMLERİ ---
+        if (packet.latitude && packet.longitude) {
+            const latlng = [packet.latitude, packet.longitude];
+            
+            // Marker Yoksa Oluştur
+            if (!markers[callsign]) {
+                const iconHTML = `<div style="background:#0dcaf0;color:#000;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:10px;border:2px solid #fff;">${callsign.substring(0,2)}</div>`;
+                const customIcon = L.divIcon({
+                    html: iconHTML,
+                    className: '',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+                
+                markers[callsign] = L.marker(latlng, {icon: customIcon}).addTo(map);
+                
+                // Track (İz) için polyline başlat
+                tracks[callsign] = L.polyline([latlng], {color: '#0dcaf0', weight: 2, opacity: 0.5}).addTo(map);
+            } else {
+                // Marker varsa konumunu güncelle
+                markers[callsign].setLatLng(latlng);
+                // İze noktayı ekle
+                tracks[callsign].addLatLng(latlng);
+            }
+            
+            // Popup İçeriği
+            let popupText = `<strong>${callsign}</strong><br>`;
+            if(packet.comment) popupText += `<small class="text-muted">${packet.comment}</small><br>`;
+            popupText += `<button class="btn btn-sm btn-info mt-2 w-100" onclick="setTarget('${callsign}')"><i class="fa-solid fa-comment"></i> Mesaj Yaz</button>`;
+            
+            markers[callsign].bindPopup(popupText);
+        }
+        
+        // --- 2. MESAJLAŞMA İŞLEMLERİ ---
+        // APRS paket formatı { format: "message", messageText: "...", addresse: "..." }
+        if (packet.format === 'message') {
+            const receiver = (packet.addresse || "").trim();
+            const text = (packet.messageText || "").trim();
+            appendMessage(callsign, receiver, text, false);
+        }
+    });
+
+    // Mesaj Gönderme Formu
+    document.getElementById('message-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const target = document.getElementById('target-input').value.trim();
+        const msgInput = document.getElementById('message-input');
+        const text = msgInput.value.trim();
+        
+        if(!target) {
+            alert("Lütfen hedefin çağrı işaretini girin!");
+            return;
+        }
+        
+        if(!text) return;
+
+        // Ekrana kendi mesajımızı ekle
+        appendMessage("Ben", target, text, true);
+        
+        // Sunucuya gönder
+        socket.emit('send_message', {
+            target: target,
+            message: text
+        }, (response) => {
+            if(response && response.status === 'error') {
+                alert("Mesaj Gönderilemedi: " + response.message);
+            }
+        });
+        
+        msgInput.value = '';
+    });
+    
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+Flask==3.0.3
+Flask-SocketIO==5.3.6
+aprslib==0.7.2
+eventlet==0.33.3

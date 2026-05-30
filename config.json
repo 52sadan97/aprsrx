@@ -1,0 +1,12 @@
+{
+  "aprs": {
+    "callsign": "TA7KES-10",
+    "passcode": "21947",
+    "server": "euro.aprs2.net",
+    "port": 14580,
+    "filter": "r/40.8/37.3/200"
+  },
+  "web": {
+    "port": 6061
+  }
+}
