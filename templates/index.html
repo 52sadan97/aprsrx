@@ -177,10 +177,10 @@
     // Zoom kontrolünü sağ alta al
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Uydu Haritası Katmanı (Esri World Imagery)
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-        maxZoom: 19
+    // Google Haritalar (Uydu + İsimler - Hybrid Katmanı)
+    L.tileLayer('http://mt0.google.com/vt/lyrs=y&hl=tr&x={x}&y={y}&z={z}', {
+        attribution: '&copy; Google Maps',
+        maxZoom: 20
     }).addTo(map);
 
     // Cihazları ve yollarını (izlerini) tutacağımız objeler
