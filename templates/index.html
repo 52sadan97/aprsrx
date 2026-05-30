@@ -114,6 +114,10 @@
             color: #0dcaf0;
             text-decoration: underline;
         }
+        @keyframes blink {
+            from { opacity: 0.7; transform: scale(1); }
+            to { opacity: 1; transform: scale(1.1); }
+        }
     </style>
 </head>
 <body>
@@ -173,10 +177,9 @@
     // Zoom kontrolünü sağ alta al
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Koyu Tema Harita Katmanı (CartoDB Dark Matter)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-        subdomains: 'abcd',
+    // Uydu Haritası Katmanı (Esri World Imagery)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
         maxZoom: 19
     }).addTo(map);
 
@@ -232,18 +235,29 @@
             
             // Marker Yoksa Oluştur
             if (!markers[callsign]) {
-                const iconHTML = `<div style="background:#0dcaf0;color:#000;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:10px;border:2px solid #fff;">${callsign.substring(0,2)}</div>`;
+                let bgColor = '#0dcaf0';
+                let textColor = '#000';
+                let pulseEffect = '';
+                
+                // Özel Takip Vurgulaması
+                if (callsign.startsWith('TA7KES') || callsign.startsWith('TA7BSS')) {
+                    bgColor = '#ffd700'; // Altın sarısı
+                    textColor = '#000';
+                    pulseEffect = `box-shadow: 0 0 15px ${bgColor}, 0 0 5px ${bgColor} inset; animation: blink 1.5s infinite alternate;`;
+                }
+                
+                const iconHTML = `<div style="background:${bgColor};color:${textColor};border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:10px;border:2px solid #fff; ${pulseEffect}">${callsign.substring(0,2)}</div>`;
                 const customIcon = L.divIcon({
                     html: iconHTML,
                     className: '',
-                    iconSize: [24, 24],
-                    iconAnchor: [12, 12]
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
                 });
                 
                 markers[callsign] = L.marker(latlng, {icon: customIcon}).addTo(map);
                 
                 // Track (İz) için polyline başlat
-                tracks[callsign] = L.polyline([latlng], {color: '#0dcaf0', weight: 2, opacity: 0.5}).addTo(map);
+                tracks[callsign] = L.polyline([latlng], {color: bgColor, weight: 2, opacity: 0.8}).addTo(map);
             } else {
                 // Marker varsa konumunu güncelle
                 markers[callsign].setLatLng(latlng);

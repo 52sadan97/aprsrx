@@ -8,6 +8,8 @@ from flask_socketio import SocketIO
 import aprslib
 import json
 import os
+import math
+import time
 
 app = Flask(__name__)
 app.secret_key = "aprsrx_secret"
@@ -23,6 +25,23 @@ def load_config():
 
 config = load_config()
 AIS = None
+welcomed_users = {}
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    R = 6371.0 # Dünya yarıçapı (km)
+    lat1_rad = math.radians(lat1)
+    lon1_rad = math.radians(lon1)
+    lat2_rad = math.radians(lat2)
+    lon2_rad = math.radians(lon2)
+    
+    dlon = lon2_rad - lon1_rad
+    dlat = lat2_rad - lat1_rad
+    
+    a = math.sin(dlat / 2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    
+    distance = R * c
+    return distance
 
 def aprs_listener():
     global AIS
@@ -43,6 +62,45 @@ def aprs_listener():
         def process_packet(packet):
             # Parse edilmiş paketi doğrudan web istemcilerine yolla
             socketio.emit('aprs_packet', packet)
+            
+            # --- Geofencing: Korgan Sınırına Girenleri Karşılama ---
+            if packet.get('latitude') and packet.get('longitude'):
+                callsign = packet.get('from')
+                lat = packet.get('latitude')
+                lon = packet.get('longitude')
+                
+                KORGAN_LAT = 40.8000
+                KORGAN_LON = 37.3000
+                RADIUS_KM = 20.0
+                
+                dist = haversine_distance(lat, lon, KORGAN_LAT, KORGAN_LON)
+                
+                if dist <= RADIUS_KM:
+                    now = time.time()
+                    last_welcomed = welcomed_users.get(callsign, 0)
+                    my_callsign = config.get("aprs", {}).get("callsign", "N0CALL")
+                    
+                    # 12 saat (43200 saniye) bekleme süresi ve kendi çağrı işaretimize atmama kontrolü
+                    if now - last_welcomed > 43200 and callsign != my_callsign:
+                        welcomed_users[callsign] = now
+                        # Hedef çağrı işaretini 9 karaktere tamamla
+                        target_padded = callsign.ljust(9)[:9]
+                        msg = "Korgan'a Hosgeldiniz, 73 de TA7KES (Op.Ertugrul)"
+                        
+                        welcome_packet = f"{my_callsign}>APRS::{target_padded}:{msg}"
+                        try:
+                            AIS.sendall(welcome_packet)
+                            print(f"KARŞILAMA MESAJI GÖNDERİLDİ: {callsign} (Mesafe: {dist:.1f}km)")
+                            
+                            # Gönderdiğimiz mesajı arayüze de düşürelim
+                            socketio.emit('aprs_packet', {
+                                "from": my_callsign,
+                                "format": "message",
+                                "addresse": target_padded.strip(),
+                                "messageText": msg
+                            })
+                        except Exception as e:
+                            print(f"Karşılama gönderilemedi: {e}")
             
         AIS.consumer(process_packet, raw=False)
     except Exception as e:
