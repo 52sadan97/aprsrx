@@ -10,6 +10,7 @@ import json
 import os
 import math
 import time
+import sqlite3
 
 app = Flask(__name__)
 app.secret_key = "aprsrx_secret"
@@ -26,6 +27,40 @@ def load_config():
 config = load_config()
 AIS = None
 welcomed_users = {}
+
+DB_FILE = "database.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS location_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            callsign TEXT,
+            lat REAL,
+            lon REAL,
+            timestamp REAL
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS message_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender TEXT,
+            receiver TEXT,
+            message_text TEXT,
+            timestamp REAL
+        )
+    ''')
+    
+    # 30 Günden eski verileri temizle
+    thirty_days_ago = time.time() - (30 * 24 * 60 * 60)
+    c.execute("DELETE FROM location_history WHERE timestamp < ?", (thirty_days_ago,))
+    c.execute("DELETE FROM message_history WHERE timestamp < ?", (thirty_days_ago,))
+    
+    conn.commit()
+    conn.close()
+
+init_db()
 
 def haversine_distance(lat1, lon1, lat2, lon2):
     R = 6371.0 # Dünya yarıçapı (km)
@@ -62,6 +97,31 @@ def aprs_listener():
         def process_packet(packet):
             # Parse edilmiş paketi doğrudan web istemcilerine yolla
             socketio.emit('aprs_packet', packet)
+            
+            callsign = packet.get('from', '')
+            
+            # --- Veritabanı Loglama ---
+            now = time.time()
+            try:
+                conn = sqlite3.connect(DB_FILE)
+                c = conn.cursor()
+                
+                # Sadece TA7KES ve TA7BSS için KONUM logla
+                if (callsign.startswith('TA7KES') or callsign.startswith('TA7BSS')) and packet.get('latitude') and packet.get('longitude'):
+                    c.execute("INSERT INTO location_history (callsign, lat, lon, timestamp) VALUES (?, ?, ?, ?)",
+                              (callsign, packet.get('latitude'), packet.get('longitude'), now))
+                
+                # BÖLGEDEKİ HERKES İÇİN (Ordu civarı 200km) MESAJLARI logla
+                if packet.get('format') == 'message':
+                    receiver = (packet.get('addresse') or "").trim() if hasattr((packet.get('addresse') or ""), "trim") else str(packet.get('addresse') or "").strip()
+                    msg_text = (packet.get('message_text') or "").trim() if hasattr((packet.get('message_text') or ""), "trim") else str(packet.get('message_text') or "").strip()
+                    c.execute("INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
+                              (callsign, receiver, msg_text, now))
+                              
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                print(f"DB Log Error: {e}")
             
             # --- Geofencing: Korgan Sınırına Girenleri Karşılama ---
             if packet.get('latitude') and packet.get('longitude'):
@@ -106,9 +166,29 @@ def aprs_listener():
     except Exception as e:
         print(f"APRS Listener Hatası: {e}")
 
-@app.route("/")
+@app.route('/')
 def index():
-    return render_template("index.html")
+    return render_template('index.html', config=config)
+
+@app.route('/api/history')
+def api_history():
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        
+        # Son 1 aylık lokasyonları çek (Zamansal sıralı)
+        c.execute("SELECT callsign, lat, lon, timestamp FROM location_history ORDER BY timestamp ASC")
+        locations = [dict(row) for row in c.fetchall()]
+        
+        # Son 1 aylık mesajları çek
+        c.execute("SELECT sender, receiver, message_text, timestamp FROM message_history ORDER BY timestamp ASC")
+        messages = [dict(row) for row in c.fetchall()]
+        
+        conn.close()
+        return json.dumps({"status": "success", "locations": locations, "messages": messages})
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
 
 @socketio.on('send_message')
 def handle_send_message(data):
