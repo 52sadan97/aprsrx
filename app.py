@@ -52,7 +52,7 @@ def init_db():
         )
     ''')
     
-    # 30 Günden eski verileri temizle
+    # Startup'ta sadece genel eski temizliği yap
     thirty_days_ago = time.time() - (30 * 24 * 60 * 60)
     c.execute("DELETE FROM location_history WHERE timestamp < ?", (thirty_days_ago,))
     c.execute("DELETE FROM message_history WHERE timestamp < ?", (thirty_days_ago,))
@@ -61,6 +61,32 @@ def init_db():
     conn.close()
 
 init_db()
+
+def db_cleanup_task():
+    while True:
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            now = time.time()
+            thirty_days_ago = now - (30 * 24 * 60 * 60)
+            two_hours_ago = now - (2 * 60 * 60)
+            
+            # TA7KES ve TA7BSS için 30 günlük temizlik
+            c.execute("DELETE FROM location_history WHERE timestamp < ? AND (callsign LIKE 'TA7KES%' OR callsign LIKE 'TA7BSS%')", (thirty_days_ago,))
+            c.execute("DELETE FROM message_history WHERE timestamp < ? AND (sender LIKE 'TA7KES%' OR sender LIKE 'TA7BSS%')", (thirty_days_ago,))
+            
+            # Diğer herkes için 2 saatlik temizlik
+            c.execute("DELETE FROM location_history WHERE timestamp < ? AND NOT (callsign LIKE 'TA7KES%' OR callsign LIKE 'TA7BSS%')", (two_hours_ago,))
+            c.execute("DELETE FROM message_history WHERE timestamp < ? AND NOT (sender LIKE 'TA7KES%' OR sender LIKE 'TA7BSS%')", (two_hours_ago,))
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print("DB Cleanup Error:", e)
+        eventlet.sleep(600)  # Her 10 dakikada bir çalıştır
+
+# Arka planda temizlik thread'ini başlat
+eventlet.spawn(db_cleanup_task)
 
 def haversine_distance(lat1, lon1, lat2, lon2):
     R = 6371.0 # Dünya yarıçapı (km)
@@ -106,12 +132,12 @@ def aprs_listener():
                 conn = sqlite3.connect(DB_FILE)
                 c = conn.cursor()
                 
-                # Sadece TA7KES ve TA7BSS için KONUM logla
-                if (callsign.startswith('TA7KES') or callsign.startswith('TA7BSS')) and packet.get('latitude') and packet.get('longitude'):
+                # HERKES İÇİN KONUM LOGLA (Temizlik thread'i yaşlarına göre süzecek)
+                if packet.get('latitude') and packet.get('longitude'):
                     c.execute("INSERT INTO location_history (callsign, lat, lon, timestamp) VALUES (?, ?, ?, ?)",
                               (callsign, packet.get('latitude'), packet.get('longitude'), now))
                 
-                # BÖLGEDEKİ HERKES İÇİN (Ordu civarı 200km) MESAJLARI logla
+                # HERKES İÇİN MESAJ LOGLA
                 if packet.get('format') == 'message':
                     receiver = (packet.get('addresse') or "").trim() if hasattr((packet.get('addresse') or ""), "trim") else str(packet.get('addresse') or "").strip()
                     msg_text = (packet.get('message_text') or "").trim() if hasattr((packet.get('message_text') or ""), "trim") else str(packet.get('message_text') or "").strip()
@@ -177,13 +203,11 @@ def api_history():
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         
-        # Son 21 saatlik verileri çek (Sayfanın hızlı yüklenmesi için)
-        twenty_one_hours_ago = time.time() - (21 * 60 * 60)
-        
-        c.execute("SELECT callsign, lat, lon, timestamp FROM location_history WHERE timestamp > ? ORDER BY timestamp ASC", (twenty_one_hours_ago,))
+        # Veritabanındaki tüm geçerli verileri çek (Temizlik thread'i süresi dolanları silmiş olacak)
+        c.execute("SELECT callsign, lat, lon, timestamp FROM location_history ORDER BY timestamp ASC")
         locations = [dict(row) for row in c.fetchall()]
         
-        c.execute("SELECT sender, receiver, message_text, timestamp FROM message_history WHERE timestamp > ? ORDER BY timestamp ASC", (twenty_one_hours_ago,))
+        c.execute("SELECT sender, receiver, message_text, timestamp FROM message_history ORDER BY timestamp ASC")
         messages = [dict(row) for row in c.fetchall()]
         
         conn.close()
