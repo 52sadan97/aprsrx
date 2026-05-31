@@ -162,16 +162,11 @@ def aprs_listener():
         
         AIS = aprslib.IS(callsign, passwd=passcode, port=port, host=server)
         
-        # Radar filtresi (varsayılan: 100km)
-        radius_filter = config.get("aprs", {}).get("filter", "r/40.8/37.3/100")
-        
-        # Takip edilecek çağrı işaretleri filtresi
+        # Sadece takip edilecek çağrı işaretleri filtresini kullan
+        # Radar filtresini kaldırdık ki herkesi çekmesin
         tracked = config.get('tracked_callsigns', [])
         buddylist = [callsign] + tracked
-        buddylist_filter = "b/" + "/".join(buddylist)
-        
-        # Filtreleri birleştir (Boşlukla ayır)
-        filter_str = f"{radius_filter} {buddylist_filter}"
+        filter_str = "b/" + "/".join(buddylist)
         
         AIS.set_filter(filter_str)
             
@@ -195,6 +190,20 @@ def aprs_listener():
                 lng = packet.get('longitude')
                 if lat and lng:
                     comment = packet.get('comment', '')
+                    
+                    # APRS.fi'den gelen hız ve yükseklik bilgisini yoruma ekle
+                    speed = packet.get('speed')
+                    alt = packet.get('altitude')
+                    if speed is not None or alt is not None:
+                        speed_val = float(speed) * 3.6 if speed is not None else 0
+                        alt_val = float(alt) if alt is not None else 0
+                        extra_parts = []
+                        if speed is not None: extra_parts.append(f"Hız: {speed_val:.1f}km/h")
+                        if alt is not None: extra_parts.append(f"Rkm: {alt_val:.0f}m")
+                        if extra_parts:
+                            extra_str = ", ".join(extra_parts)
+                            comment = f"{comment} [{extra_str}]" if comment else f"[{extra_str}]"
+                            
                     symbol = packet.get('symbol', '')
                     symbol_table = packet.get('symbol_table', '')
                     c.execute("INSERT INTO location_history (callsign, lat, lon, comment, timestamp, symbol, symbol_table) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -342,13 +351,11 @@ def api_history():
         msg_like_clauses = " OR ".join(["sender LIKE ?"] * len(important_calls))
         params = [f"{c}%" for c in important_calls]
         
-        # Yabancı istasyonların son 1 saatini de dahil et
-        one_hour_ago = time.time() - 3600
-        
-        c.execute(f"SELECT callsign, lat, lon, comment, timestamp, symbol, symbol_table FROM location_history WHERE (timestamp >= ? AND timestamp < ? AND ({loc_like_clauses})) OR (timestamp > ?) ORDER BY timestamp ASC", [start_ts, end_ts] + params + [one_hour_ago])
+        # SADECE takip edilen kişilerin verilerini getir (Yabancı istasyonları kaldır)
+        c.execute(f"SELECT callsign, lat, lon, comment, timestamp, symbol, symbol_table FROM location_history WHERE timestamp >= ? AND timestamp < ? AND ({loc_like_clauses}) ORDER BY timestamp ASC", [start_ts, end_ts] + params)
         locations = [dict(row) for row in c.fetchall()]
         
-        c.execute(f"SELECT sender, receiver, message_text, timestamp FROM message_history WHERE (timestamp >= ? AND timestamp < ? AND ({msg_like_clauses})) OR (timestamp > ?) ORDER BY timestamp ASC", [start_ts, end_ts] + params + [one_hour_ago])
+        c.execute(f"SELECT sender, receiver, message_text, timestamp FROM message_history WHERE timestamp >= ? AND timestamp < ? AND ({msg_like_clauses}) ORDER BY timestamp ASC", [start_ts, end_ts] + params)
         messages = [dict(row) for row in c.fetchall()]
         
         conn.close()
@@ -428,8 +435,8 @@ def handle_private_location(data):
         return
         
     now = time.time()
-    # Mobil uygulama için Telefon ikonunu temsil eden APRS kodunu sabitleyelim
-    symbol = '$'
+    # Mobil uygulama için Araç ikonunu temsil eden APRS kodunu sabitleyelim
+    symbol = '>'
     symbol_table = '/'
     
     # Hız ve Yüksekliği yoruma ekle

@@ -336,12 +336,17 @@
                         
                         let displayContent = loc.symbol ? getAprsIcon(loc.symbol_table, loc.symbol) : callsign.substring(0,2);
                         
-                        const iconHTML = `<div style="background:${bgColor};color:${textColor};border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid #fff; ${pulseEffect}">${displayContent}</div>`;
+                        const iconHTML = `
+                            <div style="display: flex; align-items: center; white-space: nowrap;">
+                                <div style="background:${bgColor};color:${textColor};border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff; ${pulseEffect}">${displayContent}</div>
+                                <div style="margin-left: 4px; background: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 4px; font-size: 11px; font-weight: bold; border: 1px solid #444;">${callsign}</div>
+                            </div>
+                        `;
                         const customIcon = L.divIcon({
                             html: iconHTML,
                             className: '',
-                            iconSize: [28, 28],
-                            iconAnchor: [14, 14]
+                            iconSize: [120, 24],
+                            iconAnchor: [12, 12]
                         });
                         
                         markers[callsign] = L.marker(latlng, {icon: customIcon}).addTo(map);
@@ -403,12 +408,21 @@
                 
                 let displayContent = packet.symbol ? getAprsIcon(packet.symbol_table, packet.symbol) : callsign.substring(0,2);
                 
-                const iconHTML = `<div style="background:${bgColor};color:${textColor};border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid #fff; ${pulseEffect}">${displayContent}</div>`;
+                const iconHTML = `
+                    <div style="display: flex; align-items: center; white-space: nowrap; transform: translate(-10px, -10px);">
+                        <div style="color:${bgColor}; font-size: 20px; text-shadow: 1px 1px 2px black; ${pulseEffect}">
+                            ${displayContent}
+                        </div>
+                        <div style="margin-left: 4px; background: rgba(0,0,0,0.7); color: white; padding: 1px 4px; border-radius: 3px; font-size: 11px; font-weight: bold; border: 1px solid #444;">
+                            ${callsign}
+                        </div>
+                    </div>
+                `;
                 const customIcon = L.divIcon({
                     html: iconHTML,
                     className: '',
-                    iconSize: [28, 28],
-                    iconAnchor: [14, 14]
+                    iconSize: [0, 0],
+                    iconAnchor: [0, 0]
                 });
                 
                 markers[callsign] = L.marker(latlng, {icon: customIcon}).addTo(map);
