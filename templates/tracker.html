@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>APRSRX - Mobil Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #121212;
+            --card: #1e1e1e;
+            --border: #333;
+            --accent: #0dcaf0;
+            --success: #198754;
+            --danger: #dc3545;
+        }
+        * { box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            color: #e0e0e0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .card-panel {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            width: 100%;
+            max-width: 420px;
+            margin-bottom: 16px;
+        }
+        h1 { color: var(--accent); font-size: 1.4rem; font-weight: 700; }
+        .status-dot {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: var(--danger);
+            margin-right: 6px;
+            transition: background 0.3s;
+        }
+        .status-dot.active { background: var(--success); animation: pulse 1.5s infinite; }
+        @keyframes pulse {
+            0%,100% { opacity: 1; }
+            50%      { opacity: 0.4; }
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: #888; }
+        .info-value { font-weight: 600; color: #fff; }
+        .btn-tracker {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-start {
+            background: linear-gradient(135deg, #198754, #20c997);
+            color: #fff;
+        }
+        .btn-start:hover { filter: brightness(1.1); }
+        .btn-stop {
+            background: linear-gradient(135deg, #dc3545, #e74c5e);
+            color: #fff;
+        }
+        .btn-stop:hover { filter: brightness(1.1); }
+        input.form-control {
+            background: #2d2d2d;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 10px;
+        }
+        input.form-control:focus {
+            background: #333;
+            border-color: var(--accent);
+            color: #fff;
+            box-shadow: none;
+        }
+        .log-box {
+            background: #0d0d0d;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 0.78rem;
+            font-family: monospace;
+            color: #aaa;
+            height: 140px;
+            overflow-y: auto;
+        }
+        .log-box p { margin: 2px 0; }
+        .log-success { color: #20c997; }
+        .log-error   { color: #e74c5e; }
+    </style>
+</head>
+<body>
+
+<div class="card-panel">
+    <h1><i class="fa-solid fa-location-dot me-2"></i>Mobil Tracker</h1>
+    <p class="text-muted small mb-3">Cihazınızın konumunu APRSRX sistemine gerçek zamanlı olarak gönderir.</p>
+
+    <div class="mb-3">
+        <label class="form-label small text-muted">Çağrı İşaretiniz</label>
+        <input type="text" id="callsignInput" class="form-control"
+               placeholder="Örn: TA7KES-9" maxlength="12">
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label small text-muted">Güncelleme Aralığı (saniye)</label>
+        <input type="number" id="intervalInput" class="form-control"
+               value="30" min="10" max="300">
+    </div>
+
+    <button id="startBtn" class="btn-tracker btn-start mb-2" onclick="startTracking()">
+        <i class="fa-solid fa-play me-2"></i>Takibi Başlat
+    </button>
+    <button id="stopBtn" class="btn-tracker btn-stop" onclick="stopTracking()" style="display:none;">
+        <i class="fa-solid fa-stop me-2"></i>Takibi Durdur
+    </button>
+</div>
+
+<div class="card-panel">
+    <div class="d-flex align-items-center mb-3">
+        <span class="status-dot" id="statusDot"></span>
+        <strong id="statusText">Bekleniyor</strong>
+    </div>
+    <div class="info-row">
+        <span class="info-label"><i class="fa-solid fa-location-crosshairs me-1"></i>Enlem</span>
+        <span class="info-value" id="valLat">—</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label"><i class="fa-solid fa-location-crosshairs me-1"></i>Boylam</span>
+        <span class="info-value" id="valLon">—</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label"><i class="fa-solid fa-gauge-high me-1"></i>Hız</span>
+        <span class="info-value" id="valSpeed">—</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label"><i class="fa-solid fa-mountain me-1"></i>Rakım</span>
+        <span class="info-value" id="valAlt">—</span>
+    </div>
+    <div class="info-row">
+        <span class="info-label"><i class="fa-solid fa-clock me-1"></i>Son Gönderim</span>
+        <span class="info-value" id="valTime">—</span>
+    </div>
+</div>
+
+<div class="card-panel">
+    <div class="small text-muted mb-2"><i class="fa-solid fa-terminal me-1"></i>Log</div>
+    <div class="log-box" id="logBox"></div>
+</div>
+
+<script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+<script>
+    const socket = io();
+    let trackInterval = null;
+    let watchId = null;
+
+    function log(msg, type = '') {
+        const box = document.getElementById('logBox');
+        const p   = document.createElement('p');
+        p.className = type === 'ok' ? 'log-success' : type === 'err' ? 'log-error' : '';
+        p.textContent = `[${new Date().toLocaleTimeString('tr-TR')}] ${msg}`;
+        box.appendChild(p);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function setStatus(active, text) {
+        document.getElementById('statusDot').className = 'status-dot' + (active ? ' active' : '');
+        document.getElementById('statusText').textContent = text;
+    }
+
+    function sendPosition(position) {
+        const callsign = document.getElementById('callsignInput').value.trim().toUpperCase();
+        if (!callsign) { log('Çağrı işareti girilmedi!', 'err'); return; }
+
+        const { latitude, longitude, speed, altitude } = position.coords;
+
+        document.getElementById('valLat').textContent   = latitude.toFixed(6) + '°';
+        document.getElementById('valLon').textContent   = longitude.toFixed(6) + '°';
+        document.getElementById('valSpeed').textContent = speed != null ? (speed * 3.6).toFixed(1) + ' km/h' : '—';
+        document.getElementById('valAlt').textContent   = altitude != null ? altitude.toFixed(0) + ' m' : '—';
+        document.getElementById('valTime').textContent  = new Date().toLocaleTimeString('tr-TR');
+
+        socket.emit('private_location', {
+            callsign,
+            lat: latitude,
+            lon: longitude,
+            speed: speed || 0,
+            alt: altitude || 0
+        });
+
+        log(`Konum gönderildi → ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`, 'ok');
+        setStatus(true, 'Aktif - Gönderildi');
+    }
+
+    function onGeoError(err) {
+        log(`Konum alınamadı: ${err.message}`, 'err');
+        setStatus(false, 'Konum Hatası');
+    }
+
+    function startTracking() {
+        const callsign = document.getElementById('callsignInput').value.trim();
+        if (!callsign) { log('Lütfen çağrı işareti girin!', 'err'); return; }
+
+        if (!navigator.geolocation) {
+            log('Tarayıcınız konum desteklemiyor.', 'err');
+            return;
+        }
+
+        const interval = parseInt(document.getElementById('intervalInput').value) * 1000 || 30000;
+
+        // İlk anlık konum
+        navigator.geolocation.getCurrentPosition(sendPosition, onGeoError, {
+            enableHighAccuracy: true, timeout: 10000
+        });
+
+        // Periyodik gönderim
+        trackInterval = setInterval(() => {
+            navigator.geolocation.getCurrentPosition(sendPosition, onGeoError, {
+                enableHighAccuracy: true, timeout: 10000
+            });
+        }, interval);
+
+        document.getElementById('startBtn').style.display = 'none';
+        document.getElementById('stopBtn').style.display  = 'block';
+        setStatus(true, 'Aktif');
+        log(`Takip başladı. Callsign: ${callsign}, Aralık: ${interval / 1000}s`, 'ok');
+    }
+
+    function stopTracking() {
+        if (trackInterval) clearInterval(trackInterval);
+        if (watchId)       navigator.geolocation.clearWatch(watchId);
+        trackInterval = null;
+        watchId       = null;
+
+        document.getElementById('startBtn').style.display = 'block';
+        document.getElementById('stopBtn').style.display  = 'none';
+        setStatus(false, 'Durduruldu');
+        log('Takip durduruldu.', '');
+    }
+
+    socket.on('connect',    () => log('Sunucuya bağlandı.', 'ok'));
+    socket.on('disconnect', () => { log('Bağlantı kesildi.', 'err'); setStatus(false, 'Bağlantı Kesildi'); });
+</script>
+</body>
+</html>

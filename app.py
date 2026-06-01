@@ -7,7 +7,6 @@ from flask import Flask, render_template, request, Response
 from flask_socketio import SocketIO
 import aprslib
 import json
-import os
 import math
 import time
 import sqlite3
@@ -32,7 +31,11 @@ CONFIG_FILE = "config.json"
 
 def load_config():
     if not os.path.exists(CONFIG_FILE):
-        return {"aprs": {"callsign": "NOCALL", "passcode": "-1", "server": "euro.aprs2.net", "port": 14580}}
+        return {
+            "aprs": {"callsign": "NOCALL", "passcode": "-1", "server": "euro.aprs2.net", "port": 14580},
+            "web": {"port": 6061},
+            "tracked_callsigns": []
+        }
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
@@ -63,7 +66,7 @@ def init_db():
         )
     ''')
     
-    # Eskiden kalan tablolar için eksik sütunları ekleme (Hata verirse sütun zaten vardır, yoksay)
+    # Eskiden kalan tablolar için eksik sütunları ekleme
     try:
         c.execute('ALTER TABLE location_history ADD COLUMN symbol TEXT')
         c.execute('ALTER TABLE location_history ADD COLUMN symbol_table TEXT')
@@ -109,11 +112,11 @@ def db_cleanup_task():
             tracked = config.get('tracked_callsigns', [])
             important_calls = [callsign] + tracked
             
-            # Parametre stringleri (örn: callsign LIKE ? OR callsign LIKE ?)
+            # Parametre stringleri
             loc_like_clauses = " OR ".join(["callsign LIKE ?"] * len(important_calls))
             msg_like_clauses = " OR ".join(["sender LIKE ?"] * len(important_calls))
             
-            params = [f"{c}%" for c in important_calls]
+            params = [f"{cs}%" for cs in important_calls]
             
             # Önemli olanlar için 30 günlük temizlik
             c.execute(f"DELETE FROM location_history WHERE timestamp < ? AND ({loc_like_clauses})", [thirty_days_ago] + params)
@@ -137,7 +140,7 @@ def db_cleanup_task():
 eventlet.spawn(db_cleanup_task)
 
 def haversine_distance(lat1, lon1, lat2, lon2):
-    R = 6371.0 # Dünya yarıçapı (km)
+    R = 6371.0  # Dünya yarıçapı (km)
     lat1_rad = math.radians(lat1)
     lon1_rad = math.radians(lon1)
     lat2_rad = math.radians(lat2)
@@ -152,158 +155,157 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     distance = R * c
     return distance
 
+def build_filter(callsign, tracked):
+    """
+    APRS-IS buddy-list filtresi oluşturur.
+    Tracked boş olsa bile en azından kendi callsign'imizi izleriz.
+    """
+    buddylist = [callsign] + [cs for cs in tracked if cs]
+    # Yıldız varsa zaten APRS-IS prefix eşleşmesi yapıyor, olduğu gibi bırak
+    filter_str = "b/" + "/".join(buddylist)
+    return filter_str
+
 def aprs_listener():
+    """
+    APRS-IS'e bağlanır, paketleri işler.
+    Bağlantı kopunca 30 saniye bekleyip yeniden bağlanır.
+    """
     global AIS
-    try:
-        callsign = config.get("aprs", {}).get("callsign", "N0CALL")
-        passcode = config.get("aprs", {}).get("passcode", "-1")
-        server = config.get("aprs", {}).get("server", "euro.aprs2.net")
-        port = int(config.get("aprs", {}).get("port", 14580))
-        
-        AIS = aprslib.IS(callsign, passwd=passcode, port=port, host=server)
-        
-        # Sadece takip edilecek çağrı işaretleri filtresini kullan
-        # Radar filtresini kaldırdık ki herkesi çekmesin
-        tracked = config.get('tracked_callsigns', [])
-        buddylist = [callsign] + tracked
-        filter_str = "b/" + "/".join(buddylist)
-        
-        AIS.set_filter(filter_str)
-            
-        AIS.connect()
-        print(f"APRS-IS Bağlantısı Başarılı ({server}:{port}). Filtre: {filter_str}")
-        
-        def process_packet(packet):
-            # Parse edilmiş paketi doğrudan web istemcilerine yolla
-            socketio.emit('aprs_packet', packet)
-            
-            callsign = packet.get('from', '')
-            
-            # --- Veritabanı Loglama ---
-            now = time.time()
-            try:
-                conn = sqlite3.connect(DB_FILE)
-                c = conn.cursor()
-                
-                # HERKES İÇİN KONUM LOGLA VE HOŞGELDİN MESAJI KONTROLÜ
-                lat = packet.get('latitude')
-                lng = packet.get('longitude')
-                if lat and lng:
-                    comment = packet.get('comment', '')
-                    
-                    # APRS.fi'den gelen hız ve yükseklik bilgisini yoruma ekle
-                    speed = packet.get('speed')
-                    alt = packet.get('altitude')
-                    if speed is not None or alt is not None:
-                        speed_val = float(speed) * 3.6 if speed is not None else 0
-                        alt_val = float(alt) if alt is not None else 0
-                        extra_parts = []
-                        if speed is not None: extra_parts.append(f"Hız: {speed_val:.1f}km/h")
-                        if alt is not None: extra_parts.append(f"Rkm: {alt_val:.0f}m")
-                        if extra_parts:
-                            extra_str = ", ".join(extra_parts)
-                            comment = f"{comment} [{extra_str}]" if comment else f"[{extra_str}]"
-                            
-                    symbol = packet.get('symbol', '')
-                    symbol_table = packet.get('symbol_table', '')
-                    c.execute("INSERT INTO location_history (callsign, lat, lon, comment, timestamp, symbol, symbol_table) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                              (callsign, lat, lng, comment, now, symbol, symbol_table))
-                              
-                    # --- HOŞGELDİN MESAJI ---
-                    my_callsign = config.get("aprs", {}).get("callsign", "NOCALL")
-                    # Kendimize mesaj atmayalım
-                    if not callsign.startswith(my_callsign):
-                        # Korgan merkez (40.8, 37.3) mesafesi
-                        dist = haversine(40.8, 37.3, float(lat), float(lng))
-                        if dist <= 5:
-                            c.execute("SELECT timestamp FROM welcome_history WHERE callsign = ?", (callsign,))
-                            row = c.fetchone()
-                            
-                            # 24 saatte (86400 sn) bir defa
-                            if not row or (now - row[0]) > 86400:
-                                target_padded = callsign.ljust(9)
-                                msg_text = "Korgan'a Hosgeldiniz! Iletisim: +905314913916"
-                                packet_raw = f"{my_callsign}>APRS::{target_padded}:{msg_text}"
-                                
-                                try:
-                                    if AIS:
-                                        AIS.sendall(packet_raw)
-                                        print(f"Hoşgeldin Mesajı Gönderildi: {packet_raw}")
-                                        
-                                        # Mesajı geçmişe kaydet (Telsiz mesajları ekranında görünsün)
-                                        c.execute("INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
-                                                  (my_callsign, callsign, f"[Sistem-Oto] {msg_text}", now))
-                                        
-                                        # Welcome tablosunu güncelle
-                                        c.execute("INSERT OR REPLACE INTO welcome_history (callsign, timestamp) VALUES (?, ?)", (callsign, now))
-                                except Exception as e:
-                                    print(f"Oto-mesaj gönderme hatası: {e}")
-                
-                # HERKES İÇİN MESAJ LOGLA
-                if packet.get('format') == 'message':
-                    receiver = (packet.get('addresse') or "").trim() if hasattr((packet.get('addresse') or ""), "trim") else str(packet.get('addresse') or "").strip()
-                    msg_text = (packet.get('message_text') or "").trim() if hasattr((packet.get('message_text') or ""), "trim") else str(packet.get('message_text') or "").strip()
-                    
-                    if not msg_text and packet.get('response'):
-                        resp = packet.get('response')
-                        msg_no = packet.get('msgNo', '')
-                        if resp == 'ack':
-                            msg_text = f"✅ [İletildi - ACK] Mesaj No: {msg_no}"
-                        elif resp == 'rej':
-                            msg_text = f"❌ [Reddedildi - REJ] Mesaj No: {msg_no}"
-                        else:
-                            msg_text = f"[Sistem: {resp}]"
-                            
-                    c.execute("INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
-                              (callsign, receiver, msg_text, now))
-                              
-                conn.commit()
-                conn.close()
-            except Exception as e:
-                print(f"DB Log Error: {e}")
-            
-            # --- Geofencing: Korgan Sınırına Girenleri Karşılama ---
-            if packet.get('latitude') and packet.get('longitude'):
-                callsign = packet.get('from')
-                lat = packet.get('latitude')
-                lon = packet.get('longitude')
-                
-                KORGAN_LAT = 40.8000
-                KORGAN_LON = 37.3000
-                RADIUS_KM = 5.0
-                
-                dist = haversine_distance(lat, lon, KORGAN_LAT, KORGAN_LON)
-                
-                if dist <= RADIUS_KM:
-                    now = time.time()
-                    last_welcomed = welcomed_users.get(callsign, 0)
-                    my_callsign = config.get("aprs", {}).get("callsign", "N0CALL")
-                    
-                    # 12 saat (43200 saniye) bekleme süresi ve kendi çağrı işaretimize atmama kontrolü
-                    if now - last_welcomed > 43200 and callsign != my_callsign:
-                        welcomed_users[callsign] = now
-                        # Hedef çağrı işaretini 9 karaktere tamamla
-                        target_padded = callsign.ljust(9)[:9]
-                        msg = "Korgan'a Hosgeldiniz, 73 de TA7KES (Op.Ertugrul)"
-                        
-                        welcome_packet = f"{my_callsign}>APRS::{target_padded}:{msg}"
-                        try:
-                            AIS.sendall(welcome_packet)
-                            print(f"KARŞILAMA MESAJI GÖNDERİLDİ: {callsign} (Mesafe: {dist:.1f}km)")
-                            
-                            # Gönderdiğimiz mesajı arayüze de düşürelim
-                            socketio.emit('aprs_packet', {
-                                "from": my_callsign,
-                                "format": "message",
-                                "addresse": target_padded.strip(),
-                                "messageText": msg
-                            })
-                        except Exception as e:
-                            print(f"Karşılama gönderilemedi: {e}")
-            
-        AIS.consumer(process_packet, raw=False)
-    except Exception as e:
-        print(f"APRS Listener Hatası: {e}")
+    RECONNECT_DELAY = 30  # saniye
+
+    while True:
+        try:
+            cfg = load_config()  # Her bağlantıda güncel config oku
+            callsign = cfg.get("aprs", {}).get("callsign", "N0CALL")
+            passcode = cfg.get("aprs", {}).get("passcode", "-1")
+            server = cfg.get("aprs", {}).get("server", "euro.aprs2.net")
+            port = int(cfg.get("aprs", {}).get("port", 14580))
+            tracked = cfg.get('tracked_callsigns', [])
+
+            filter_str = build_filter(callsign, tracked)
+
+            AIS = aprslib.IS(callsign, passwd=passcode, port=port, host=server)
+            AIS.set_filter(filter_str)
+            AIS.connect()
+            print(f"APRS-IS Bağlantısı Başarılı ({server}:{port}). Filtre: {filter_str}")
+
+            def process_packet(packet):
+                pkt_callsign = packet.get('from', '')
+
+                # --- Filtreleme: Sadece takip listesi + kendi callsign ---
+                cfg_now = load_config()
+                my_callsign = cfg_now.get("aprs", {}).get("callsign", "NOCALL")
+                tracked_now = cfg_now.get('tracked_callsigns', [])
+                allowed = [my_callsign] + tracked_now
+
+                # SSID'siz eşleşme: TA7KES-9 listede TA7KES varsa da kabul et
+                def matches_any(cs, allowed_list):
+                    cs_base = cs.split('-')[0].upper()
+                    for a in allowed_list:
+                        a_base = a.split('-')[0].upper()
+                        if cs.upper() == a.upper() or cs_base == a_base:
+                            return True
+                    return False
+
+                if not matches_any(pkt_callsign, allowed):
+                    return  # İzin verilmeyen istasyon, yoksay
+
+                # Parse edilmiş paketi web istemcilerine yolla
+                socketio.emit('aprs_packet', packet)
+
+                now = time.time()
+                try:
+                    conn = sqlite3.connect(DB_FILE)
+                    c = conn.cursor()
+
+                    # KONUM LOGLA
+                    lat = packet.get('latitude')
+                    lng = packet.get('longitude')
+                    if lat and lng:
+                        comment = packet.get('comment', '')
+
+                        speed = packet.get('speed')
+                        alt = packet.get('altitude')
+                        if speed is not None or alt is not None:
+                            speed_val = float(speed) * 3.6 if speed is not None else 0
+                            alt_val = float(alt) if alt is not None else 0
+                            extra_parts = []
+                            if speed is not None:
+                                extra_parts.append(f"Hız: {speed_val:.1f}km/h")
+                            if alt is not None:
+                                extra_parts.append(f"Rkm: {alt_val:.0f}m")
+                            if extra_parts:
+                                extra_str = ", ".join(extra_parts)
+                                comment = f"{comment} [{extra_str}]" if comment else f"[{extra_str}]"
+
+                        symbol = packet.get('symbol', '')
+                        symbol_table = packet.get('symbol_table', '')
+                        c.execute(
+                            "INSERT INTO location_history (callsign, lat, lon, comment, timestamp, symbol, symbol_table) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            (pkt_callsign, lat, lng, comment, now, symbol, symbol_table)
+                        )
+
+                        # --- HOŞGELDİN MESAJI (DB tabanlı, tek sistem) ---
+                        # Kendimize mesaj atmayalım
+                        if not pkt_callsign.upper().startswith(my_callsign.upper()):
+                            dist = haversine(40.8, 37.3, float(lat), float(lng))
+                            if dist <= 5:
+                                c.execute("SELECT timestamp FROM welcome_history WHERE callsign = ?", (pkt_callsign,))
+                                row = c.fetchone()
+
+                                # 24 saatte bir defa
+                                if not row or (now - row[0]) > 86400:
+                                    target_padded = pkt_callsign.ljust(9)
+                                    msg_text = "Korgan'a Hosgeldiniz! Iletisim: +905314913916"
+                                    packet_raw = f"{my_callsign}>APRS::{target_padded}:{msg_text}"
+
+                                    try:
+                                        if AIS:
+                                            AIS.sendall(packet_raw)
+                                            print(f"Hoşgeldin Mesajı Gönderildi: {packet_raw}")
+
+                                            c.execute(
+                                                "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
+                                                (my_callsign, pkt_callsign, f"[Sistem-Oto] {msg_text}", now)
+                                            )
+                                            c.execute(
+                                                "INSERT OR REPLACE INTO welcome_history (callsign, timestamp) VALUES (?, ?)",
+                                                (pkt_callsign, now)
+                                            )
+                                    except Exception as e:
+                                        print(f"Oto-mesaj gönderme hatası: {e}")
+
+                    # MESAJ LOGLA  (BUG FIX: .trim() → .strip())
+                    if packet.get('format') == 'message':
+                        receiver = str(packet.get('addresse') or '').strip()
+                        msg_text = str(packet.get('message_text') or '').strip()
+
+                        if not msg_text and packet.get('response'):
+                            resp = packet.get('response')
+                            msg_no = packet.get('msgNo', '')
+                            if resp == 'ack':
+                                msg_text = f"✅ [İletildi - ACK] Mesaj No: {msg_no}"
+                            elif resp == 'rej':
+                                msg_text = f"❌ [Reddedildi - REJ] Mesaj No: {msg_no}"
+                            else:
+                                msg_text = f"[Sistem: {resp}]"
+
+                        c.execute(
+                            "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
+                            (pkt_callsign, receiver, msg_text, now)
+                        )
+
+                    conn.commit()
+                    conn.close()
+                except Exception as e:
+                    print(f"DB Log Error: {e}")
+
+            AIS.consumer(process_packet, raw=False)
+
+        except Exception as e:
+            print(f"APRS Listener Hatası: {e}. {RECONNECT_DELAY} saniye sonra yeniden bağlanılıyor...")
+            AIS = None
+            eventlet.sleep(RECONNECT_DELAY)
 
 @app.route('/')
 def index():
@@ -329,13 +331,11 @@ def api_history():
                 start_ts = dt.timestamp()
                 end_ts = start_ts + 86400
             except ValueError:
-                # Hatalı tarih formatıysa bugünü kullan
                 now = datetime.datetime.now()
                 dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
                 start_ts = dt.timestamp()
                 end_ts = start_ts + 86400
         else:
-            # Parametre yoksa bugünü kullan
             now = datetime.datetime.now()
             dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
             start_ts = dt.timestamp()
@@ -349,17 +349,27 @@ def api_history():
         
         loc_like_clauses = " OR ".join(["callsign LIKE ?"] * len(important_calls))
         msg_like_clauses = " OR ".join(["sender LIKE ?"] * len(important_calls))
-        params = [f"{c}%" for c in important_calls]
+        params = [f"{cs}%" for cs in important_calls]
         
-        # SADECE takip edilen kişilerin verilerini getir (Yabancı istasyonları kaldır)
-        c.execute(f"SELECT callsign, lat, lon, comment, timestamp, symbol, symbol_table FROM location_history WHERE timestamp >= ? AND timestamp < ? AND ({loc_like_clauses}) ORDER BY timestamp ASC", [start_ts, end_ts] + params)
+        c.execute(
+            f"SELECT callsign, lat, lon, comment, timestamp, symbol, symbol_table FROM location_history "
+            f"WHERE timestamp >= ? AND timestamp < ? AND ({loc_like_clauses}) ORDER BY timestamp ASC",
+            [start_ts, end_ts] + params
+        )
         locations = [dict(row) for row in c.fetchall()]
         
-        c.execute(f"SELECT sender, receiver, message_text, timestamp FROM message_history WHERE timestamp >= ? AND timestamp < ? AND ({msg_like_clauses}) ORDER BY timestamp ASC", [start_ts, end_ts] + params)
+        c.execute(
+            f"SELECT sender, receiver, message_text, timestamp FROM message_history "
+            f"WHERE timestamp >= ? AND timestamp < ? AND ({msg_like_clauses}) ORDER BY timestamp ASC",
+            [start_ts, end_ts] + params
+        )
         messages = [dict(row) for row in c.fetchall()]
         
         conn.close()
-        response = Response(json.dumps({"status": "success", "locations": locations, "messages": messages}), mimetype='application/json')
+        response = Response(
+            json.dumps({"status": "success", "locations": locations, "messages": messages}),
+            mimetype='application/json'
+        )
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         return response
     except Exception as e:
@@ -372,7 +382,7 @@ def api_settings():
         data = request.json
         if data and 'tracked_callsigns' in data:
             # Temizle ve kaydet (kullanıcı * koymuşsa temizle)
-            callsigns = [c.strip().upper().replace('*', '') for c in data['tracked_callsigns'] if c.strip()]
+            callsigns = [cs.strip().upper().replace('*', '') for cs in data['tracked_callsigns'] if cs.strip()]
             cfg['tracked_callsigns'] = callsigns
             save_config(cfg)
             
@@ -397,7 +407,6 @@ def handle_send_message(data):
     if not target or not msg:
         return {"status": "error", "message": "Eksik bilgi"}
         
-    # APRS protokolünde hedefin çağrı işareti tam 9 karakter olmalı (boşluklarla tamamlanır)
     target_padded = target.ljust(9)[:9]
     
     if AIS:
@@ -407,12 +416,13 @@ def handle_send_message(data):
             AIS.sendall(packet_raw)
             print(f"Mesaj Gönderildi: {packet_raw}")
             
-            # Gönderilen mesajı veritabanına kaydet
             now = time.time()
             conn = sqlite3.connect(DB_FILE)
             c = conn.cursor()
-            c.execute("INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
-                      (callsign, target, msg, now))
+            c.execute(
+                "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
+                (callsign, target, msg, now)
+            )
             conn.commit()
             conn.close()
             
@@ -435,11 +445,9 @@ def handle_private_location(data):
         return
         
     now = time.time()
-    # Mobil uygulama için Araç ikonunu temsil eden APRS kodunu sabitleyelim
     symbol = '>'
     symbol_table = '/'
     
-    # Hız ve Yüksekliği yoruma ekle
     comment_text = "Mobil Tracker"
     if speed or alt:
         comment_text += f" (Hız: {speed:.1f}m/s, Rkm: {alt:.0f}m)"
@@ -447,14 +455,15 @@ def handle_private_location(data):
     try:
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
-        c.execute("INSERT INTO location_history (callsign, lat, lon, comment, timestamp, symbol, symbol_table) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                  (callsign, lat, lon, comment_text, now, symbol, symbol_table))
+        c.execute(
+            "INSERT INTO location_history (callsign, lat, lon, comment, timestamp, symbol, symbol_table) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (callsign, lat, lon, comment_text, now, symbol, symbol_table)
+        )
         conn.commit()
         conn.close()
     except Exception as e:
         print(f"Private Tracker DB Error: {e}")
         
-    # Anlık olarak haritaya düşmesi için sahte bir APRS paketi hazırlayıp yayınla
     packet = {
         "from": callsign,
         "latitude": lat,

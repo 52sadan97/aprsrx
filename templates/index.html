@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>APRSRX - Canlı Radar & Mesajlaşma</title>
+    <title>APRSRX - Canlı Radar &amp; Mesajlaşma</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- FontAwesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
+
     <style>
         body, html {
             height: 100%;
@@ -30,7 +30,7 @@
             letter-spacing: 1px;
         }
         #map {
-            height: calc(100vh - 56px); /* Navbar height subtracted */
+            height: calc(100vh - 56px);
             width: 100%;
             z-index: 1;
         }
@@ -116,7 +116,10 @@
         }
         @keyframes blink {
             from { opacity: 0.7; transform: scale(1); }
-            to { opacity: 1; transform: scale(1.1); }
+            to   { opacity: 1;   transform: scale(1.1); }
+        }
+        .live-dot {
+            animation: blink 1.5s infinite alternate;
         }
     </style>
 </head>
@@ -124,10 +127,13 @@
 
 <nav class="navbar navbar-expand-lg navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="#"><i class="fa-solid fa-radar"></i> APRSRX Canlı Harita</a>
+        <!-- BUG FIX: fa-radar yok → fa-satellite-dish kullanıldı -->
+        <a class="navbar-brand" href="#"><i class="fa-solid fa-satellite-dish"></i> APRSRX Canlı Harita</a>
         <div class="d-flex align-items-center">
             <input type="date" id="historyDate" class="form-control form-control-sm bg-dark text-white border-secondary me-3" style="width: auto;">
-            <span class="text-muted"><i class="fa-solid fa-circle text-success ms-3 me-1 blink"></i> Canlı Dinleniyor...</span>
+            <span class="text-muted">
+                <i class="fa-solid fa-circle text-success ms-3 me-1 live-dot"></i> Canlı Dinleniyor...
+            </span>
         </div>
     </div>
 </nav>
@@ -138,32 +144,40 @@
         <div class="col-md-8 col-lg-9">
             <div id="map"></div>
         </div>
-        
+
         <!-- Mesajlaşma Yan Paneli -->
         <div class="col-md-4 col-lg-3" id="sidebar">
             <div class="chat-header d-flex justify-content-between align-items-center">
                 <span><i class="fa-solid fa-comments text-info"></i> Telsiz Mesajları</span>
                 <div>
                     <span class="badge bg-secondary me-1" id="target-badge">Genel İzleme</span>
-                    <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#settingsModal" title="Ayarlar" onclick="loadSettings()">
+                    <button class="btn btn-sm btn-outline-info"
+                            data-bs-toggle="modal"
+                            data-bs-target="#settingsModal"
+                            title="Ayarlar"
+                            onclick="loadSettings()">
                         <i class="fa-solid fa-gear"></i>
                     </button>
                 </div>
             </div>
-            
+
             <div class="chat-messages" id="chat-messages">
-                <div class="text-center text-muted mt-3 small">
+                <div class="text-center text-muted mt-3 small" id="chat-placeholder">
                     <i class="fa-solid fa-satellite-dish mb-2" style="font-size: 24px;"></i><br>
                     APRS-IS Ağı Dinleniyor...<br>Henüz mesaj yok.
                 </div>
             </div>
-            
+
             <div class="chat-input-area">
                 <form id="message-form" class="d-flex flex-column gap-2">
-                    <input type="text" id="target-input" class="form-control form-control-sm" placeholder="Hedef Çağrı İşareti (Örn: TA7KES-1)">
+                    <input type="text" id="target-input" class="form-control form-control-sm"
+                           placeholder="Hedef Çağrı İşareti (Örn: TA7KES-1)">
                     <div class="input-group">
-                        <input type="text" id="message-input" class="form-control" placeholder="Mesajınızı yazın..." required>
-                        <button class="btn btn-info" type="submit"><i class="fa-solid fa-paper-plane"></i></button>
+                        <input type="text" id="message-input" class="form-control"
+                               placeholder="Mesajınızı yazın..." required>
+                        <button class="btn btn-info" type="submit">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
                     </div>
                 </form>
             </div>
@@ -174,21 +188,32 @@
 <!-- Ayarlar Modal -->
 <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <div class="modal-content text-dark bg-dark text-light border-secondary">
+    <div class="modal-content bg-dark text-light border-secondary">
       <div class="modal-header border-secondary">
         <h5 class="modal-title"><i class="fa-solid fa-satellite-dish"></i> APRS Takip Ayarları</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
       </div>
       <div class="modal-body">
         <div class="mb-3">
           <label for="trackedCallsigns" class="form-label">Takip Edilecek Çağrı İşaretleri</label>
-          <input type="text" class="form-control bg-secondary text-light border-dark" id="trackedCallsigns" placeholder="TA7KES, TA7BSS, YM7KSE">
-          <div class="form-text text-light opacity-75">Çağrı işaretlerini virgülle ayırarak giriniz. Sistem bu istasyonlardan gelen konum ve mesajları dinleyecektir.</div>
+          <input type="text" class="form-control bg-secondary text-light border-dark"
+                 id="trackedCallsigns" placeholder="TA7KES, TA7BSS, YM7KSE">
+          <div class="form-text text-light opacity-75">
+            Çağrı işaretlerini virgülle ayırarak giriniz. Sistem bu istasyonlardan gelen konum ve mesajları dinleyecektir.
+          </div>
+        </div>
+        <!-- Mevcut config bilgisi -->
+        <div class="alert alert-secondary p-2 small mb-0">
+          <i class="fa-solid fa-circle-info me-1"></i>
+          Bağlı callsign: <strong>{{ config.get('aprs', {}).get('callsign', 'NOCALL') }}</strong><br>
+          Sunucu: <strong>{{ config.get('aprs', {}).get('server', '-') }}:{{ config.get('aprs', {}).get('port', '-') }}</strong>
         </div>
       </div>
       <div class="modal-footer border-secondary">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-        <button type="button" class="btn btn-info" onclick="saveSettings()">Kaydet ve Yeniden Başlat</button>
+        <button type="button" class="btn btn-info" onclick="saveSettings()">
+            <i class="fa-solid fa-floppy-disk me-1"></i>Kaydet ve Yeniden Başlat
+        </button>
       </div>
     </div>
   </div>
@@ -202,333 +227,284 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    // Haritayı Başlat (Varsayılan Merkez: Ordu/Korgan civarı)
-    const map = L.map('map', {
-        zoomControl: false // Sağ alta alacağız
-    }).setView([40.8, 37.3], 9);
+    // ─── Jinja2: Takip listesini JS dizisine güvenli şekilde aktar ──────────────
+    // BUG FIX: config.aprs.callsign Jinja2'de geçersiz → config.get(...) kullanılmalı
+    const MY_CALLSIGN    = "{{ config.get('aprs', {}).get('callsign', 'NOCALL') }}";
+    const TRACKED_CALLS  = [
+        {% for t in config.get('tracked_callsigns', []) %}
+        "{{ t }}"{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    const ALL_ALLOWED    = [MY_CALLSIGN, ...TRACKED_CALLS];
 
-    // Zoom kontrolünü sağ alta al
+    function isTrackedCallsign(cs) {
+        const csBase = cs.split('-')[0].toUpperCase();
+        return ALL_ALLOWED.some(a => {
+            const aBase = a.split('-')[0].toUpperCase();
+            return cs.toUpperCase() === a.toUpperCase() || csBase === aBase;
+        });
+    }
+
+    // ─── Harita Başlatma ──────────────────────────────────────────────────────
+    const map = L.map('map', { zoomControl: false }).setView([40.8, 37.3], 9);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Google Haritalar (Uydu + İsimler - Hybrid Katmanı)
-    L.tileLayer('http://mt0.google.com/vt/lyrs=y&hl=tr&x={x}&y={y}&z={z}', {
+    // BUG FIX: http:// → https:// (Mixed-content hatası engellendi)
+    L.tileLayer('https://mt0.google.com/vt/lyrs=y&hl=tr&x={x}&y={y}&z={z}', {
         attribution: '&copy; Google Maps',
         maxZoom: 20
     }).addTo(map);
 
-    // Cihazları ve yollarını (izlerini) tutacağımız objeler
     const markers = {};
-    const tracks = {};
-    
-    // Mesajlar için Socket.IO Bağlantısı
-    const socket = io();
-    const chatContainer = document.getElementById('chat-messages');
-    
+    const tracks  = {};
+
+    const socket          = io();
+    const chatContainer   = document.getElementById('chat-messages');
+    const chatPlaceholder = document.getElementById('chat-placeholder');
+
+    // ─── Yardımcı: Hedef Seç ─────────────────────────────────────────────────
     function setTarget(callsign) {
         document.getElementById('target-input').value = callsign;
         document.getElementById('target-badge').innerText = callsign;
         document.getElementById('message-input').focus();
     }
-    
+
+    // ─── Yardımcı: Mesaj Kutusu Ekle ─────────────────────────────────────────
     function appendMessage(sender, receiver, text, isSelf, customTime = null) {
-        // Remove initial placeholder if exists
-        const placeholder = chatContainer.querySelector('.text-center');
-        if (placeholder) placeholder.remove();
-        
-        let time = customTime;
-        if (!time) {
-            time = new Date().toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'});
-        }
+        if (chatPlaceholder) chatPlaceholder.remove();
+
+        const time = customTime || new Date().toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'});
         const msgDiv = document.createElement('div');
         msgDiv.className = `message-box ${isSelf ? 'self' : 'other'}`;
-        
+
         msgDiv.innerHTML = `
             <div class="message-header">
-                <strong class="${!isSelf ? 'btn-chat-target' : ''}" onclick="${!isSelf ? `setTarget('${sender}')` : ''}">${sender}</strong>
+                <strong class="${!isSelf ? 'btn-chat-target' : ''}"
+                        onclick="${!isSelf ? `setTarget('${sender}')` : ''}">${sender}</strong>
                 <span>${time}</span>
             </div>
             <div>${text}</div>
-            ${!isSelf && receiver ? `<div style="font-size: 0.7rem; color: #888; text-align: right; margin-top: 4px;">Hedef: ${receiver}</div>` : ''}
+            ${!isSelf && receiver
+                ? `<div style="font-size:0.7rem;color:#888;text-align:right;margin-top:4px;">Hedef: ${receiver}</div>`
+                : ''}
         `;
-        
+
         chatContainer.appendChild(msgDiv);
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }
 
-    socket.on('connect', () => {
-        console.log("Sunucuya bağlanıldı!");
-    });
-
-    // APRS Simgesini FontAwesome İkonuna Çevirme
+    // ─── APRS Simge Eşlemesi ─────────────────────────────────────────────────
     function getAprsIcon(symbolTable, symbol) {
-        let faClass = "fa-broadcast-tower"; // Varsayılan
+        let faClass = 'fa-broadcast-tower';
         if (symbolTable === '/' || symbolTable === '\\') {
-            switch(symbol) {
-                case '>': faClass = "fa-car"; break;
-                case 'v': faClass = "fa-van-shuttle"; break;
-                case 'k': faClass = "fa-truck"; break;
-                case 'j': faClass = "fa-truck-pickup"; break;
-                case '<': faClass = "fa-motorcycle"; break;
-                case '[': faClass = "fa-person-running"; break;
-                case 'Y': faClass = "fa-ship"; break;
-                case '-': faClass = "fa-house"; break;
-                case '=': faClass = "fa-train"; break;
-                case 'O': faClass = "fa-parachute-box"; break;
-                case 'X': faClass = "fa-helicopter"; break;
-                case '&': faClass = "fa-tower-broadcast"; break;
-                case 'I': faClass = "fa-network-wired"; break;
-                case 'b': faClass = "fa-bicycle"; break;
-                case 'a': faClass = "fa-truck-medical"; break;
-                case 's': faClass = "fa-ship"; break;
-                case '_': faClass = "fa-cloud"; break;
-            }
+            const MAP = {
+                '>': 'fa-car',
+                'v': 'fa-van-shuttle',
+                'k': 'fa-truck',
+                'j': 'fa-truck-pickup',
+                '<': 'fa-motorcycle',
+                '[': 'fa-person-running',
+                'Y': 'fa-ship',
+                '-': 'fa-house',
+                '=': 'fa-train',
+                'O': 'fa-parachute-box',
+                'X': 'fa-helicopter',
+                '&': 'fa-tower-broadcast',
+                'I': 'fa-network-wired',
+                'b': 'fa-bicycle',
+                'a': 'fa-truck-medical',
+                's': 'fa-ship',
+                '_': 'fa-cloud',
+            };
+            faClass = MAP[symbol] || faClass;
         }
         return `<i class="fa-solid ${faClass}"></i>`;
     }
 
-    // Tarih Seçici Değişimi
-    document.getElementById('historyDate').addEventListener('change', function(e) {
+    // ─── Marker Oluştur veya Güncelle ────────────────────────────────────────
+    function buildIconHTML(callsign, symbolTable, symbol) {
+        const tracked      = isTrackedCallsign(callsign);
+        const bgColor      = tracked ? '#ffd700' : '#0dcaf0';
+        const textColor    = '#000';
+        const pulseStyle   = tracked
+            ? `box-shadow:0 0 15px ${bgColor},0 0 5px ${bgColor} inset;animation:blink 1.5s infinite alternate;`
+            : '';
+        const content      = symbol ? getAprsIcon(symbolTable, symbol) : callsign.substring(0, 2);
+
+        return `
+            <div style="display:flex;align-items:center;white-space:nowrap;transform:translate(-10px,-10px);">
+                <div style="color:${bgColor};font-size:20px;text-shadow:1px 1px 2px black;${pulseStyle}">
+                    ${content}
+                </div>
+                <div style="margin-left:4px;background:rgba(0,0,0,0.7);color:white;padding:1px 4px;
+                            border-radius:3px;font-size:11px;font-weight:bold;border:1px solid #444;">
+                    ${callsign}
+                </div>
+            </div>
+        `;
+    }
+
+    function upsertMarker(callsign, latlng, symbolTable, symbol, popupText) {
+        const tracked  = isTrackedCallsign(callsign);
+        const bgColor  = tracked ? '#ffd700' : '#0dcaf0';
+        const iconHTML = buildIconHTML(callsign, symbolTable, symbol);
+        const divIcon  = L.divIcon({ html: iconHTML, className: '', iconSize: [0, 0], iconAnchor: [0, 0] });
+
+        if (!markers[callsign]) {
+            markers[callsign] = L.marker(latlng, { icon: divIcon }).addTo(map);
+            tracks[callsign]  = L.polyline([latlng], { color: bgColor, weight: 2, opacity: 0.8 }).addTo(map);
+        } else {
+            // BUG FIX: Marker varsa ikonunu da güncelle (renk/puls değişebilir)
+            markers[callsign].setLatLng(latlng);
+            markers[callsign].setIcon(divIcon);
+            tracks[callsign].addLatLng(latlng);
+        }
+        markers[callsign].bindPopup(popupText);
+    }
+
+    // ─── Tarih Seçici ────────────────────────────────────────────────────────
+    document.getElementById('historyDate').addEventListener('change', function (e) {
         loadHistory(e.target.value);
     });
-    
-    // Geçmiş Verileri Yükle
+
+    // ─── Geçmiş Verileri Yükle ───────────────────────────────────────────────
     function loadHistory(dateStr) {
         let url = '/api/history?t=' + new Date().getTime();
         if (dateStr) url += '&date=' + dateStr;
-        
-        // Önce haritayı temizle
-        for (let key in markers) {
-            map.removeLayer(markers[key]);
-        }
-        for (let key in tracks) {
-            map.removeLayer(tracks[key]);
-        }
-        // Objelere sıfırdan başla (referansları sıfırlamıyoruz ki const hata vermesin, içini boşaltıyoruz ama dict olarak tanımlı const ise hata vermez)
+
+        // Haritayı temizle
+        Object.values(markers).forEach(m => map.removeLayer(m));
+        Object.values(tracks).forEach(t => map.removeLayer(t));
         Object.keys(markers).forEach(k => delete markers[k]);
         Object.keys(tracks).forEach(k => delete tracks[k]);
         chatContainer.innerHTML = '';
-        
+
         fetch(url)
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
-            if (data.status === 'success') {
-                // Lokasyon Geçmişi
+                if (data.status !== 'success') return;
+
+                // Konum geçmişi
                 data.locations.forEach(loc => {
-                    const latlng = [loc.lat, loc.lon];
+                    const latlng   = [loc.lat, loc.lon];
                     const callsign = loc.callsign;
-                    
-                    if (!markers[callsign]) {
-                        let bgColor = '#0dcaf0';
-                        let textColor = '#000';
-                        let pulseEffect = '';
-                        
-                        let isTracked = false;
-                        if (callsign.startsWith('{{ config.aprs.callsign }}')) isTracked = true;
-                        {% for t in config.get('tracked_callsigns', []) %}
-                        if (callsign.startsWith('{{ t }}')) isTracked = true;
-                        {% endfor %}
-                        
-                        if (isTracked) {
-                            bgColor = '#ffd700';
-                            textColor = '#000';
-                            pulseEffect = `box-shadow: 0 0 15px ${bgColor}, 0 0 5px ${bgColor} inset; animation: blink 1.5s infinite alternate;`;
-                        }
-                        
-                        let displayContent = loc.symbol ? getAprsIcon(loc.symbol_table, loc.symbol) : callsign.substring(0,2);
-                        
-                        const iconHTML = `
-                            <div style="display: flex; align-items: center; white-space: nowrap;">
-                                <div style="background:${bgColor};color:${textColor};border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid #fff; ${pulseEffect}">${displayContent}</div>
-                                <div style="margin-left: 4px; background: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 4px; font-size: 11px; font-weight: bold; border: 1px solid #444;">${callsign}</div>
-                            </div>
-                        `;
-                        const customIcon = L.divIcon({
-                            html: iconHTML,
-                            className: '',
-                            iconSize: [120, 24],
-                            iconAnchor: [12, 12]
-                        });
-                        
-                        markers[callsign] = L.marker(latlng, {icon: customIcon}).addTo(map);
-                        tracks[callsign] = L.polyline([latlng], {color: bgColor, weight: 2, opacity: 0.8}).addTo(map);
-                    } else {
-                        markers[callsign].setLatLng(latlng);
-                        tracks[callsign].addLatLng(latlng);
-                    }
-                    
-                    let popupText = `<strong>${callsign}</strong><br>`;
+                    const lastSeen = new Date(loc.timestamp * 1000).toLocaleString('tr-TR');
+
+                    let popupText  = `<strong>${callsign}</strong><br>`;
                     if (loc.comment) popupText += `<small class="text-muted">${loc.comment}</small><br>`;
-                    popupText += `<small class="text-muted">Son Görülme: ${new Date(loc.timestamp * 1000).toLocaleString('tr-TR')}</small><br>`;
-                    popupText += `<button class="btn btn-sm btn-info mt-2 w-100" onclick="setTarget('${callsign}')"><i class="fa-solid fa-comment"></i> Mesaj Yaz</button>`;
-                    markers[callsign].bindPopup(popupText);
+                    popupText += `<small class="text-muted">Son Görülme: ${lastSeen}</small><br>`;
+                    popupText += `<button class="btn btn-sm btn-info mt-2 w-100" onclick="setTarget('${callsign}')">
+                                    <i class="fa-solid fa-comment"></i> Mesaj Yaz
+                                  </button>`;
+
+                    upsertMarker(callsign, latlng, loc.symbol_table, loc.symbol, popupText);
                 });
-                
-                // Mesaj Geçmişi
+
+                // Mesaj geçmişi
                 data.messages.forEach(msg => {
-                    const customTime = new Date(msg.timestamp * 1000).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'});
-                    const isSelf = msg.sender.startsWith('{{ config.aprs.callsign }}');
+                    const customTime = new Date(msg.timestamp * 1000)
+                        .toLocaleTimeString('tr-TR', {hour: '2-digit', minute: '2-digit'});
+                    const isSelf = msg.sender.toUpperCase().startsWith(MY_CALLSIGN.split('-')[0].toUpperCase());
                     appendMessage(msg.sender, msg.receiver, msg.message_text, isSelf, customTime);
                 });
-            }
-        });
+            })
+            .catch(err => console.error('loadHistory error:', err));
     }
-    
-    // Sayfa yüklenince bugünün tarihini atayıp yükle
+
+    // Sayfa yüklenince bugünü seç ve yükle
     document.getElementById('historyDate').valueAsDate = new Date();
     loadHistory(document.getElementById('historyDate').value);
 
+    // ─── Canlı APRS Paket İşleme ─────────────────────────────────────────────
+    socket.on('connect', () => console.log('Sunucuya bağlanıldı!'));
+
     socket.on('aprs_packet', (packet) => {
-        // Konsolda görmek isterseniz açabilirsiniz
-        // console.log(packet);
-        
         const callsign = packet.from;
-        
-        // --- 1. HARİTA (KONUM) İŞLEMLERİ ---
+        if (!callsign) return;
+
+        // Konum varsa haritaya ekle
         if (packet.latitude && packet.longitude) {
             const latlng = [packet.latitude, packet.longitude];
-            
-            // Marker Yoksa Oluştur
-            if (!markers[callsign]) {
-                let bgColor = '#0dcaf0';
-                let textColor = '#000';
-                let pulseEffect = '';
-                
-                let isTracked = false;
-                if (callsign.startsWith('{{ config.aprs.callsign }}')) isTracked = true;
-                {% for t in config.get('tracked_callsigns', []) %}
-                if (callsign.startsWith('{{ t }}')) isTracked = true;
-                {% endfor %}
-                
-                // Özel Takip Vurgulaması
-                if (isTracked) {
-                    bgColor = '#ffd700'; // Altın sarısı
-                    textColor = '#000';
-                    pulseEffect = `box-shadow: 0 0 15px ${bgColor}, 0 0 5px ${bgColor} inset; animation: blink 1.5s infinite alternate;`;
-                }
-                
-                let displayContent = packet.symbol ? getAprsIcon(packet.symbol_table, packet.symbol) : callsign.substring(0,2);
-                
-                const iconHTML = `
-                    <div style="display: flex; align-items: center; white-space: nowrap; transform: translate(-10px, -10px);">
-                        <div style="color:${bgColor}; font-size: 20px; text-shadow: 1px 1px 2px black; ${pulseEffect}">
-                            ${displayContent}
-                        </div>
-                        <div style="margin-left: 4px; background: rgba(0,0,0,0.7); color: white; padding: 1px 4px; border-radius: 3px; font-size: 11px; font-weight: bold; border: 1px solid #444;">
-                            ${callsign}
-                        </div>
-                    </div>
-                `;
-                const customIcon = L.divIcon({
-                    html: iconHTML,
-                    className: '',
-                    iconSize: [0, 0],
-                    iconAnchor: [0, 0]
-                });
-                
-                markers[callsign] = L.marker(latlng, {icon: customIcon}).addTo(map);
-                
-                // Track (İz) için polyline başlat
-                tracks[callsign] = L.polyline([latlng], {color: bgColor, weight: 2, opacity: 0.8}).addTo(map);
-            } else {
-                // Marker varsa konumunu güncelle
-                markers[callsign].setLatLng(latlng);
-                // İze noktayı ekle
-                tracks[callsign].addLatLng(latlng);
-            }
-            
-            // Popup İçeriği
+
             let popupText = `<strong>${callsign}</strong><br>`;
-            if(packet.comment) popupText += `<small class="text-muted">${packet.comment}</small><br>`;
-            popupText += `<button class="btn btn-sm btn-info mt-2 w-100" onclick="setTarget('${callsign}')"><i class="fa-solid fa-comment"></i> Mesaj Yaz</button>`;
-            
-            markers[callsign].bindPopup(popupText);
+            if (packet.comment) popupText += `<small class="text-muted">${packet.comment}</small><br>`;
+            popupText += `<button class="btn btn-sm btn-info mt-2 w-100" onclick="setTarget('${callsign}')">
+                            <i class="fa-solid fa-comment"></i> Mesaj Yaz
+                          </button>`;
+
+            upsertMarker(callsign, latlng, packet.symbol_table, packet.symbol, popupText);
         }
-        
-        // --- 2. MESAJLAŞMA İŞLEMLERİ ---
-        // APRS paket formatı { format: "message", message_text: "...", addresse: "..." }
+
+        // Mesaj paketi
         if (packet.format === 'message') {
-            const receiver = (packet.addresse || "").trim();
-            let text = (packet.message_text || "").trim();
-            
+            const receiver = (packet.addresse || '').trim();
+            let text       = (packet.message_text || '').trim();
+
             if (!text && packet.response) {
-                if (packet.response === 'ack') {
-                    text = `✅ [İletildi - ACK] Mesaj No: ${packet.msgNo || ''}`;
-                } else if (packet.response === 'rej') {
-                    text = `❌ [Reddedildi - REJ] Mesaj No: ${packet.msgNo || ''}`;
-                } else {
-                    text = `[Sistem: ${packet.response}]`;
-                }
+                if      (packet.response === 'ack') text = `✅ [İletildi - ACK] Mesaj No: ${packet.msgNo || ''}`;
+                else if (packet.response === 'rej') text = `❌ [Reddedildi - REJ] Mesaj No: ${packet.msgNo || ''}`;
+                else                                text = `[Sistem: ${packet.response}]`;
             }
-            
+
             appendMessage(callsign, receiver, text, false);
         }
     });
 
-    // Mesaj Gönderme Formu
+    // ─── Mesaj Gönderme ───────────────────────────────────────────────────────
     document.getElementById('message-form').addEventListener('submit', (e) => {
         e.preventDefault();
-        const target = document.getElementById('target-input').value.trim();
+        const target   = document.getElementById('target-input').value.trim();
         const msgInput = document.getElementById('message-input');
-        const text = msgInput.value.trim();
-        
-        if(!target) {
-            alert("Lütfen hedefin çağrı işaretini girin!");
-            return;
-        }
-        
-        if(!text) return;
+        const text     = msgInput.value.trim();
 
-        // Ekrana kendi mesajımızı ekle
-        appendMessage("Ben", target, text, true);
-        
-        // Sunucuya gönder
-        socket.emit('send_message', {
-            target: target,
-            message: text
-        }, (response) => {
-            if(response && response.status === 'error') {
-                alert("Mesaj Gönderilemedi: " + response.message);
+        if (!target) { alert('Lütfen hedefin çağrı işaretini girin!'); return; }
+        if (!text)   return;
+
+        appendMessage('Ben', target, text, true);
+
+        socket.emit('send_message', { target, message: text }, (response) => {
+            if (response && response.status === 'error') {
+                alert('Mesaj Gönderilemedi: ' + response.message);
             }
         });
-        
+
         msgInput.value = '';
     });
-    
-    // Ayarlar Yükleme ve Kaydetme İşlemleri
+
+    // ─── Ayarlar ──────────────────────────────────────────────────────────────
     function loadSettings() {
         fetch('/api/settings')
-            .then(res => res.json())
+            .then(r => r.json())
             .then(data => {
                 if (data.status === 'success') {
-                    document.getElementById('trackedCallsigns').value = data.tracked_callsigns.join(', ');
+                    document.getElementById('trackedCallsigns').value =
+                        data.tracked_callsigns.join(', ');
                 }
             })
-            .catch(err => console.error("Ayarlar yüklenemedi:", err));
+            .catch(err => console.error('Ayarlar yüklenemedi:', err));
     }
 
     function saveSettings() {
-        const input = document.getElementById('trackedCallsigns').value;
+        const input     = document.getElementById('trackedCallsigns').value;
         const callsigns = input.split(',').map(c => c.trim()).filter(c => c);
-        
+
         fetch('/api/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tracked_callsigns: callsigns })
         })
-        .then(res => res.json())
+        .then(r => r.json())
         .then(data => {
             if (data.status === 'success') {
                 alert(data.message);
                 const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
                 if (modal) modal.hide();
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500); // Yeniden başlama süresi tanıyıp sayfayı yenile
+                setTimeout(() => window.location.reload(), 1500);
             } else {
-                alert("Hata: " + data.message);
+                alert('Hata: ' + data.message);
             }
         })
-        .catch(err => alert("Ayarlar kaydedilemedi!"));
+        .catch(() => alert('Ayarlar kaydedilemedi!'));
     }
 </script>
 </body>
