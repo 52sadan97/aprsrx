@@ -822,8 +822,14 @@
         }
     }
 
-    document.getElementById('historyDate').valueAsDate = new Date();
-    loadHistory(document.getElementById('historyDate').value);
+    // Sayfa Yüklenince
+    window.addEventListener('DOMContentLoaded', () => {
+        const today = new Date();
+        const offset = today.getTimezoneOffset() * 60000;
+        const localISOTime = (new Date(today - offset)).toISOString().split('T')[0];
+        document.getElementById('historyDate').value = localISOTime;
+        loadHistory(document.getElementById('historyDate').value);
+    });
 
     // ─── Canlı APRS Paket ─────────────────────────────────────────────────────
     socket.on('connect', () => console.log('Sunucuya bağlanıldı!'));

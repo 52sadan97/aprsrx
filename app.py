@@ -58,6 +58,7 @@ def save_config(cfg):
 
 config = load_config()
 AIS = None
+tcp_clients = []
 welcomed_users = {}
 
 DB_FILE = "database.db"
@@ -367,6 +368,8 @@ def handle_tcp_client(sock, address):
             fd.write(f"# logresp {callsign} unverified, server aprsrx\r\n")
             fd.flush()
             print(f"[{address[0]}:{address[1]}] Login kabul edildi: {callsign}")
+            
+        tcp_clients.append(fd)
         
         while True:
             line = fd.readline()
@@ -384,6 +387,8 @@ def handle_tcp_client(sock, address):
     except Exception as e:
         print(f"[{address[0]}:{address[1]}] TCP İstemci hatası: {e}")
     finally:
+        if fd in tcp_clients:
+            tcp_clients.remove(fd)
         sock.close()
         print(f"[{address[0]}:{address[1]}] İstemci ayrıldı.")
 
@@ -519,12 +524,13 @@ def handle_send_message(data):
     
     if not target or not msg:
         return {"status": "error", "message": "Eksik bilgi"}
-        
-    target_padded = target.ljust(9)[:9]
     
+    my_call = config.get("aprs", {}).get("callsign", "N0CALL")
+    
+    # APRS-IS üzerinden gönder
     if AIS:
-        callsign = config.get("aprs", {}).get("callsign", "N0CALL")
-        packet_raw = f"{callsign}>APRS::{target_padded}:{msg}"
+        target_padded = target.ljust(9)[:9]
+        packet_raw = f"{my_call}>APRS::{target_padded}:{msg}"
         try:
             AIS.sendall(packet_raw)
             print(f"Mesaj Gönderildi: {packet_raw}")
@@ -534,10 +540,18 @@ def handle_send_message(data):
             c = conn.cursor()
             c.execute(
                 "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
-                (callsign, target, msg, now)
+                (my_call, target, msg, now)
             )
             conn.commit()
             conn.close()
+            
+            # Aynı zamanda bağlı TCP istemcilerine (APRSdroid vb.) yankıla (echo)
+            for client_fd in tcp_clients:
+                try:
+                    client_fd.write(packet_raw + "\r\n")
+                    client_fd.flush()
+                except Exception as e:
+                    print(f"[Echo] TCP istemcisine mesaj gönderilirken hata: {e}")
             
             return {"status": "success", "packet": packet_raw}
         except Exception as e:
