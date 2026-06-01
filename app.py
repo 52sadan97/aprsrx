@@ -1,5 +1,6 @@
 import os
 os.environ['EVENTLET_NO_GREENDNS'] = 'yes'
+# pyrefly: ignore [missing-import]
 import eventlet
 eventlet.monkey_patch()
 
@@ -359,7 +360,30 @@ def aprs_listener():
             AIS.connect()
             print(f"APRS-IS Bağlantısı Başarılı ({server}:{port}). Filtre: {filter_str}")
 
-            AIS.consumer(process_parsed_packet, raw=False)
+            def process_global_packet(raw_line):
+                # Gelen raw byteları stringe çevir
+                if isinstance(raw_line, bytes):
+                    try:
+                        line_str = raw_line.decode('utf-8', 'ignore')
+                    except:
+                        line_str = str(raw_line)
+                else:
+                    line_str = raw_line
+
+                # Globalden gelen (takip listesindeki) araç konumlarını yerel ağdaki cihazlara yankıla
+                for client_fd in tcp_clients:
+                    try:
+                        client_fd.write(line_str.strip() + "\r\n")
+                        client_fd.flush()
+                    except: pass
+                
+                try:
+                    packet = aprslib.parse(raw_line)
+                    process_parsed_packet(packet)
+                except Exception:
+                    pass
+
+            AIS.consumer(process_global_packet, raw=True)
 
         except Exception as e:
             print(f"APRS Listener Hatası: {e}. {RECONNECT_DELAY} saniye sonra yeniden bağlanılıyor...")
