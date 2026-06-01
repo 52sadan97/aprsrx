@@ -378,6 +378,21 @@ def handle_tcp_client(sock, address):
             if not line or line.startswith('#'): continue
             
             try:
+                # Diğer TCP istemcilerine gönder (Kendisi hariç)
+                for client_fd in tcp_clients:
+                    if client_fd != fd:
+                        try:
+                            client_fd.write(line + "\r\n")
+                            client_fd.flush()
+                        except: pass
+                
+                # Global APRS-IS'e gönder (Eğer bağlıysa)
+                if AIS:
+                    try:
+                        AIS.sendall(line)
+                    except Exception as e:
+                        print(f"[{address[0]}:{address[1]}] AIS forward hatası: {e}")
+
                 packet = aprslib.parse(line)
                 process_parsed_packet(packet)
             except aprslib.ParseError:
