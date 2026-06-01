@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APRSRX — Giriş</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0f;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ─── Animasyonlu arka plan ─── */
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            animation: gridMove 20s linear infinite;
+        }
+        @keyframes gridMove {
+            0%   { background-position: 0 0; }
+            100% { background-position: 40px 40px; }
+        }
+
+        .bg-glow {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.12;
+            animation: glowPulse 6s ease-in-out infinite alternate;
+        }
+        .bg-glow-1 {
+            background: #00d4ff;
+            top: -200px; left: -200px;
+        }
+        .bg-glow-2 {
+            background: #7b61ff;
+            bottom: -200px; right: -200px;
+            animation-delay: -3s;
+        }
+        @keyframes glowPulse {
+            from { opacity: 0.08; transform: scale(0.9); }
+            to   { opacity: 0.18; transform: scale(1.1); }
+        }
+
+        /* ─── Radar animasyonu ─── */
+        .radar-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 700px;
+            height: 700px;
+            opacity: 0.04;
+            pointer-events: none;
+        }
+        .radar-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 1px solid #00d4ff;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .radar-ring:nth-child(1) { width: 100px; height: 100px; }
+        .radar-ring:nth-child(2) { width: 200px; height: 200px; }
+        .radar-ring:nth-child(3) { width: 350px; height: 350px; }
+        .radar-ring:nth-child(4) { width: 500px; height: 500px; }
+        .radar-ring:nth-child(5) { width: 700px; height: 700px; }
+        .radar-sweep {
+            position: absolute;
+            width: 50%;
+            height: 50%;
+            top: 0; left: 50%;
+            transform-origin: bottom left;
+            background: conic-gradient(from 0deg, transparent 340deg, rgba(0,212,255,0.5) 360deg);
+            animation: sweep 4s linear infinite;
+        }
+        @keyframes sweep {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+
+        /* ─── Login Kartı ─── */
+        .login-card {
+            position: relative;
+            z-index: 10;
+            background: rgba(20, 20, 30, 0.85);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 20px;
+            padding: 48px 44px;
+            width: 100%;
+            max-width: 420px;
+            backdrop-filter: blur(20px);
+            box-shadow:
+                0 0 0 1px rgba(0, 212, 255, 0.05),
+                0 20px 60px rgba(0, 0, 0, 0.6),
+                inset 0 1px 0 rgba(255,255,255,0.05);
+            animation: cardIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+        }
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(30px) scale(0.95); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* ─── Logo ─── */
+        .logo-area {
+            text-align: center;
+            margin-bottom: 36px;
+        }
+        .logo-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #00d4ff22, #7b61ff22);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            color: #00d4ff;
+            margin-bottom: 16px;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.15);
+            animation: iconPulse 3s ease-in-out infinite;
+        }
+        @keyframes iconPulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 212, 255, 0.15); }
+            50%       { box-shadow: 0 0 40px rgba(0, 212, 255, 0.35); }
+        }
+        .logo-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 2px;
+        }
+        .logo-title span {
+            color: #00d4ff;
+        }
+        .logo-subtitle {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.4);
+            margin-top: 4px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* ─── Form ─── */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .input-wrapper {
+            position: relative;
+        }
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(0, 212, 255, 0.5);
+            font-size: 0.9rem;
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+        .form-input {
+            width: 100%;
+            padding: 13px 14px 13px 40px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            color: #ffffff;
+            font-size: 0.95rem;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
+        }
+        .form-input::placeholder { color: rgba(255,255,255,0.25); }
+        .form-input:focus {
+            border-color: #00d4ff;
+            background: rgba(0, 212, 255, 0.06);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.12);
+        }
+        .form-input:focus + .input-icon,
+        .input-wrapper:focus-within .input-icon {
+            color: #00d4ff;
+        }
+
+        /* toggle show/hide password */
+        .toggle-pwd {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255,255,255,0.3);
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+        .toggle-pwd:hover { color: #00d4ff; }
+
+        /* ─── Hata mesajı ─── */
+        .error-alert {
+            background: rgba(255, 60, 60, 0.12);
+            border: 1px solid rgba(255, 60, 60, 0.3);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: #ff7070;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97);
+        }
+        @keyframes shake {
+            10%, 90% { transform: translateX(-2px); }
+            20%, 80% { transform: translateX(3px);  }
+            30%, 50%, 70% { transform: translateX(-4px); }
+            40%, 60% { transform: translateX(4px);  }
+        }
+
+        /* ─── Giriş Butonu ─── */
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #00d4ff, #0095b3);
+            border: none;
+            border-radius: 10px;
+            color: #000;
+            font-size: 0.95rem;
+            font-weight: 700;
+            font-family: 'Inter', sans-serif;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-login::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+        }
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 212, 255, 0.45);
+        }
+        .btn-login:active {
+            transform: translateY(0);
+            opacity: 0.9;
+        }
+        .btn-login i { margin-right: 8px; }
+
+        /* ─── Alt bilgi ─── */
+        .footer-text {
+            text-align: center;
+            margin-top: 28px;
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.2);
+        }
+        .footer-text span { color: rgba(0, 212, 255, 0.5); }
+
+        /* ─── Sinyal noktaları ─── */
+        .signal-dots {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 20px;
+        }
+        .signal-dot {
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: rgba(0, 212, 255, 0.3);
+            animation: signalBlink 2s ease-in-out infinite;
+        }
+        .signal-dot:nth-child(2) { animation-delay: 0.3s; }
+        .signal-dot:nth-child(3) { animation-delay: 0.6s; }
+        @keyframes signalBlink {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50%       { opacity: 1;   transform: scale(1.4); background: #00d4ff; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <div class="radar-container">
+        <div class="radar-ring"></div>
+        <div class="radar-ring"></div>
+        <div class="radar-ring"></div>
+        <div class="radar-ring"></div>
+        <div class="radar-ring"></div>
+        <div class="radar-sweep"></div>
+    </div>
+
+    <div class="login-card">
+        <div class="logo-area">
+            <div class="logo-icon">
+                <i class="fa-solid fa-satellite-dish"></i>
+            </div>
+            <div class="logo-title">APRS<span>RX</span></div>
+            <div class="logo-subtitle">Canlı Harita &amp; Mesajlaşma Sistemi</div>
+        </div>
+
+        {% if error %}
+        <div class="error-alert">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/login" autocomplete="off">
+            <div class="form-group">
+                <label class="form-label" for="password">Erişim Şifresi</label>
+                <div class="input-wrapper">
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        class="form-input"
+                        placeholder="••••••••••"
+                        required
+                        autofocus
+                    >
+                    <i class="fa-solid fa-lock input-icon"></i>
+                    <button type="button" class="toggle-pwd" id="togglePwd" onclick="togglePassword()">
+                        <i class="fa-solid fa-eye" id="pwdEyeIcon"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-login" id="loginBtn">
+                <i class="fa-solid fa-right-to-bracket"></i> Sisteme Gir
+            </button>
+        </form>
+
+        <div class="signal-dots">
+            <div class="signal-dot"></div>
+            <div class="signal-dot"></div>
+            <div class="signal-dot"></div>
+        </div>
+
+        <div class="footer-text">
+            <span><i class="fa-solid fa-shield-halved"></i></span>
+            &nbsp;Yetkisiz erişime kapalı sistem — SdnNET
+        </div>
+    </div>
+
+    <script>
+        function togglePassword() {
+            const input = document.getElementById('password');
+            const icon  = document.getElementById('pwdEyeIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-solid fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-solid fa-eye';
+            }
+        }
+
+        // Enter tuşu animasyonu
+        document.getElementById('loginBtn').addEventListener('click', function() {
+            this.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Doğrulanıyor...';
+        });
+    </script>
+</body>
+</html>

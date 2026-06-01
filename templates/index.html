@@ -10,6 +10,8 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- APRS Symbols -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/OK-DMR/aprs-symbols@master/aprs-symbols.css" />
 
     <style>
         body, html {
@@ -89,6 +91,42 @@
             background-color: #252526;
             border-top: 1px solid #333;
         }
+        /* ─── Hedef Göstergesi ─────────────────────────────── */
+        .target-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            margin-bottom: 2px;
+            font-size: 0.82rem;
+        }
+        .target-bar.has-target {
+            background: rgba(41,121,255,0.08);
+            border-color: rgba(41,121,255,0.3);
+        }
+        .target-bar .target-label {
+            color: #666;
+            white-space: nowrap;
+        }
+        .target-bar .target-callsign {
+            font-weight: 700;
+            font-size: 0.88rem;
+            color: #2979ff;
+            letter-spacing: 0.5px;
+        }
+        .target-bar .target-clear {
+            margin-left: auto;
+            color: #555;
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 1px 5px;
+            border-radius: 3px;
+            transition: color 0.2s;
+        }
+        .target-bar .target-clear:hover { color: #e53935; }
         .form-control {
             background-color: #2d2d2d;
             border: 1px solid #444;
@@ -121,6 +159,96 @@
         .live-dot {
             animation: blink 1.5s infinite alternate;
         }
+
+        /* ─── APRS Marker Animasyonları ──────────────────────── */
+        @keyframes aprsRingPulse {
+            0%   { transform: translate(-50%,-50%) scale(0.4); opacity: 1; }
+            100% { transform: translate(-50%,-50%) scale(2.8); opacity: 0; }
+        }
+        .aprs-marker-wrapper {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            transform: translate(-12px, -12px);
+        }
+        .aprs-marker-inner {
+            position: relative;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .aprs-pulse-ring {
+            position: absolute;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 2px solid;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%,-50%) scale(0.4);
+            animation: aprsRingPulse 2.2s ease-out infinite;
+            pointer-events: none;
+        }
+        .aprs-symbol-box {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .aprs-symbol-box img {
+            width: 24px;
+            height: 24px;
+            image-rendering: pixelated;
+        }
+        .aprs-marker-label {
+            margin-left: 6px;
+            background: rgba(0,0,0,0.78);
+            color: #ffffff;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid rgba(255,255,255,0.12);
+            letter-spacing: 0.3px;
+        }
+        .aprs-marker-label.tracked {
+            color: #42a5f5;
+            border-color: rgba(66,165,245,0.45);
+            text-shadow: 0 0 8px rgba(66,165,245,0.4);
+        }
+
+        /* ─── Routing Badge ──────────────────────────────────── */
+        .routing-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.7rem;
+            padding: 3px 9px;
+            border-radius: 20px;
+            background: rgba(33,150,243,0.15);
+            border: 1px solid rgba(33,150,243,0.35);
+            color: #42a5f5;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            user-select: none;
+        }
+        .routing-badge:hover { background: rgba(33,150,243,0.25); }
+        .routing-badge.routing-busy {
+            background: rgba(255,165,0,0.15);
+            border-color: rgba(255,165,0,0.4);
+            color: #ffa726;
+        }
+        .routing-badge.routing-off {
+            opacity: 0.45;
+            background: rgba(255,255,255,0.05);
+            border-color: rgba(255,255,255,0.1);
+            color: #888;
+        }
     </style>
 </head>
 <body>
@@ -129,11 +257,20 @@
     <div class="container-fluid">
         <!-- BUG FIX: fa-radar yok → fa-satellite-dish kullanıldı -->
         <a class="navbar-brand" href="#"><i class="fa-solid fa-satellite-dish"></i> APRSRX Canlı Harita</a>
-        <div class="d-flex align-items-center">
-            <input type="date" id="historyDate" class="form-control form-control-sm bg-dark text-white border-secondary me-3" style="width: auto;">
+        <div class="d-flex align-items-center gap-2">
+            <input type="date" id="historyDate" class="form-control form-control-sm bg-dark text-white border-secondary" style="width: auto;">
+            <select id="callsignFilter" class="form-select form-select-sm bg-dark text-white border-secondary" style="width: auto;" title="Araç Filtrele">
+                <option value="ALL">Tüm Araçlar</option>
+            </select>
             <span class="text-muted">
-                <i class="fa-solid fa-circle text-success ms-3 me-1 live-dot"></i> Canlı Dinleniyor...
+                <i class="fa-solid fa-circle text-success ms-2 me-1 live-dot"></i> Canlı Dinleniyor...
             </span>
+            <span class="routing-badge" id="routingBadge" onclick="toggleRoadSnap()" title="Tıkla: Yol eşlemeyi aç/kapat">
+                <i class="fa-solid fa-road"></i> Yol Eşleme
+            </span>
+            <a href="/logout" class="btn btn-sm btn-outline-secondary ms-2" title="Çıkış Yap" style="border-color:#555;">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </a>
         </div>
     </div>
 </nav>
@@ -169,13 +306,23 @@
             </div>
 
             <div class="chat-input-area">
+                <!-- Canlı Hedef Göstergesi -->
+                <div class="target-bar" id="targetBar">
+                    <i class="fa-solid fa-arrow-right" style="color:#555;"></i>
+                    <span class="target-label">Hedef:</span>
+                    <span class="target-callsign" id="targetDisplay">Seçilmedi</span>
+                    <span class="target-clear" onclick="clearTarget()" title="Hedefi Temizle">
+                        <i class="fa-solid fa-xmark"></i>
+                    </span>
+                </div>
                 <form id="message-form" class="d-flex flex-column gap-2">
                     <input type="text" id="target-input" class="form-control form-control-sm"
-                           placeholder="Hedef Çağrı İşareti (Örn: TA7KES-1)">
+                           placeholder="Hedef Çağrı İşareti (Orn: TA7KES-1)"
+                           oninput="updateTargetBar(this.value)">
                     <div class="input-group">
                         <input type="text" id="message-input" class="form-control"
                                placeholder="Mesajınızı yazın..." required>
-                        <button class="btn btn-info" type="submit">
+                        <button class="btn btn-info" type="submit" id="sendBtn">
                             <i class="fa-solid fa-paper-plane"></i>
                         </button>
                     </div>
@@ -225,17 +372,20 @@
 <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- APRS Symbols JS -->
+<script src="https://cdn.jsdelivr.net/gh/OK-DMR/aprs-symbols@master/aprs-symbols.js"></script>
+<!-- Leaflet PolylineDecorator (ok işaretleri) -->
+<script src="https://cdn.jsdelivr.net/npm/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.min.js"></script>
 
 <script>
-    // ─── Jinja2: Takip listesini JS dizisine güvenli şekilde aktar ──────────────
-    // BUG FIX: config.aprs.callsign Jinja2'de geçersiz → config.get(...) kullanılmalı
-    const MY_CALLSIGN    = "{{ config.get('aprs', {}).get('callsign', 'NOCALL') }}";
-    const TRACKED_CALLS  = [
+    // ─── Jinja2 ───────────────────────────────────────────────────────────────
+    const MY_CALLSIGN  = "{{ config.get('aprs', {}).get('callsign', 'NOCALL') }}";
+    const TRACKED_CALLS = [
         {% for t in config.get('tracked_callsigns', []) %}
         "{{ t }}"{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
-    const ALL_ALLOWED    = [MY_CALLSIGN, ...TRACKED_CALLS];
+    const ALL_ALLOWED = [MY_CALLSIGN, ...TRACKED_CALLS];
 
     function isTrackedCallsign(cs) {
         const csBase = cs.split('-')[0].toUpperCase();
@@ -245,256 +395,501 @@
         });
     }
 
-    // ─── Harita Başlatma ──────────────────────────────────────────────────────
+    // ─── Harita Başlatma ───────────────────────────────────────────────────────
     const map = L.map('map', { zoomControl: false }).setView([40.8, 37.3], 9);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // BUG FIX: http:// → https:// (Mixed-content hatası engellendi)
-    L.tileLayer('https://mt0.google.com/vt/lyrs=y&hl=tr&x={x}&y={y}&z={z}', {
-        attribution: '&copy; Google Maps',
-        maxZoom: 20
-    }).addTo(map);
+    const googleHybrid = L.tileLayer('https://mt0.google.com/vt/lyrs=y&hl=tr&x={x}&y={y}&z={z}', { attribution: '&copy; Google Maps', maxZoom: 20 });
+    const googleStreet = L.tileLayer('https://mt0.google.com/vt/lyrs=m&hl=tr&x={x}&y={y}&z={z}', { attribution: '&copy; Google Maps', maxZoom: 20 });
+    const osm          = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',         { attribution: '&copy; OpenStreetMap', maxZoom: 19 });
 
-    const markers = {};
-    const tracks  = {};
+    googleHybrid.addTo(map);
+    L.control.layers({ "Google Uydu (Karma)": googleHybrid, "Google Harita": googleStreet, "OpenStreetMap": osm }, null, { position: 'topright' }).addTo(map);
+
+    // ─── Durum Değişkenleri ────────────────────────────────────────────────────
+    const markers     = {};   // callsign → L.Marker
+    const trackGroups = {};   // callsign → L.LayerGroup
+    const rawPoints   = {};   // callsign → [[lat,lon], ...]
+    const routeCache  = {};   // "lat,lon|lat,lon" → [[lat,lon], ...]
+    let   roadSnap    = true;
+    let   activeFilter = 'ALL';
+
+    // ─── Filtreleme Mantığı ───────────────────────────────────────────────────
+    document.getElementById('callsignFilter').addEventListener('change', (e) => {
+        activeFilter = e.target.value;
+        applyFilter();
+    });
+
+    function applyFilter() {
+        Object.keys(markers).forEach(callsign => {
+            const show = (activeFilter === 'ALL' || activeFilter === callsign);
+            if (show) {
+                if (!map.hasLayer(markers[callsign])) markers[callsign].addTo(map);
+                if (trackGroups[callsign] && !map.hasLayer(trackGroups[callsign])) trackGroups[callsign].addTo(map);
+            } else {
+                if (map.hasLayer(markers[callsign])) map.removeLayer(markers[callsign]);
+                if (trackGroups[callsign] && map.hasLayer(trackGroups[callsign])) map.removeLayer(trackGroups[callsign]);
+            }
+        });
+    }
+
+    function ensureCallsignOption(callsign) {
+        const filterSelect = document.getElementById('callsignFilter');
+        if (!Array.from(filterSelect.options).some(o => o.value === callsign)) {
+            const opt = document.createElement('option');
+            opt.value = callsign;
+            opt.textContent = callsign;
+            filterSelect.appendChild(opt);
+        }
+    }
+
+    const MAX_GAP_KM = 80;   // Bu kadar atlarsa yeni segment
+    const CHUNK_SIZE = 8;    // OSRM başına max waypoint
+
+    // Her callsign'a farklı renk ata
+    const COLOR_PALETTE = [
+        '#2979ff', // mavi
+        '#00c853', // yeşil
+        '#ff6d00', // turuncu
+        '#aa00ff', // mor
+        '#00b0ff', // açık mavi
+        '#c51162', // pembe-kırmızı
+        '#64dd17', // lime
+        '#ffab00', // amber
+        '#00bfa5', // teal
+        '#d50000', // kırmızı
+    ];
+    const callsignColorMap = {};
+    let   colorIdx         = 0;
+
+    function getColor(callsign) {
+        if (!callsignColorMap[callsign]) {
+            callsignColorMap[callsign] = COLOR_PALETTE[colorIdx % COLOR_PALETTE.length];
+            colorIdx++;
+        }
+        return callsignColorMap[callsign];
+    }
 
     const socket          = io();
     const chatContainer   = document.getElementById('chat-messages');
     const chatPlaceholder = document.getElementById('chat-placeholder');
 
-    // ─── Yardımcı: Hedef Seç ─────────────────────────────────────────────────
-    function setTarget(callsign) {
-        document.getElementById('target-input').value = callsign;
-        document.getElementById('target-badge').innerText = callsign;
+    // ─── Yardımcı Fonksiyonlar ─────────────────────────────────────────────────
+    function haversineKm(lat1, lon1, lat2, lon2) {
+        const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function chunkArray(arr, n) {
+        const r = [];
+        for (let i = 0; i < arr.length; i += n) r.push(arr.slice(i, i + n));
+        return r;
+    }
+
+    // Çok fazla nokta varsa aralıklı örnekle (max maxN nokta)
+    function downsample(pts, maxN) {
+        if (pts.length <= maxN) return pts;
+        const result = [pts[0]];
+        const step   = (pts.length - 1) / (maxN - 1);
+        for (let i = 1; i < maxN - 1; i++) result.push(pts[Math.round(i * step)]);
+        result.push(pts[pts.length - 1]);
+        return result;
+    }
+
+    // ─── Routing Status Badge ─────────────────────────────────────────────────
+    function setRoutingBadge(state) {
+        // state: 'idle' | 'busy' | 'off'
+        const badge = document.getElementById('routingBadge');
+        if (!badge) return;
+        badge.className = 'routing-badge' + (state === 'busy' ? ' routing-busy' : state === 'off' ? ' routing-off' : '');
+        badge.innerHTML = state === 'busy'
+            ? '<i class="fa-solid fa-circle-notch fa-spin"></i> Yol Hesaplanıyor...'
+            : state === 'off'
+                ? '<i class="fa-solid fa-road"></i> Yol Eşleme Kapalı'
+                : '<i class="fa-solid fa-road"></i> Yol Eşleme';
+    }
+
+    function toggleRoadSnap() {
+        roadSnap = !roadSnap;
+        setRoutingBadge(roadSnap ? 'idle' : 'off');
+        // Tüm track'leri yeniden çiz
+        const calls = Object.keys(rawPoints);
+        (async () => {
+            for (const cs of calls) await redrawTrack(cs);
+        })();
+    }
+
+    // ─── OSRM Yol Eşleme ─────────────────────────────────────────────────────
+    async function fetchOSRMRoute(points) {
+        if (!roadSnap || points.length < 2) return points;
+
+        const key = points.map(p => `${p[0].toFixed(4)},${p[1].toFixed(4)}`).join('|');
+        if (routeCache[key]) return routeCache[key];
+
+        const coordStr = points.map(p => `${p[1].toFixed(6)},${p[0].toFixed(6)}`).join(';');
+        try {
+            const ctrl = new AbortController();
+            const tid  = setTimeout(() => ctrl.abort(), 7000);
+            const res  = await fetch(
+                `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`,
+                { signal: ctrl.signal }
+            );
+            clearTimeout(tid);
+            if (!res.ok) throw 0;
+            const data = await res.json();
+            if (data.code === 'Ok' && data.routes?.[0]?.geometry?.coordinates?.length) {
+                const result = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                routeCache[key] = result;
+                return result;
+            }
+        } catch (e) { /* timeout veya hata → düz çizgi */ }
+        return points;
+    }
+
+    // Tüm noktaları segmentlere böl ve her segmenti OSRM ile route et
+    async function routeAllPoints(points) {
+        if (points.length < 2) return [points];
+
+        // Büyük atlamalar = yeni segment
+        const segments = [];
+        let cur = [points[0]];
+        for (let i = 1; i < points.length; i++) {
+            const d = haversineKm(points[i-1][0], points[i-1][1], points[i][0], points[i][1]);
+            if (d > MAX_GAP_KM) { segments.push(cur); cur = [points[i]]; }
+            else cur.push(points[i]);
+        }
+        segments.push(cur);
+
+        const result = [];
+        for (const seg of segments) {
+            if (!roadSnap || seg.length < 2) { result.push(seg); continue; }
+            const sampled = downsample(seg, 40);
+            const chunks  = chunkArray(sampled, CHUNK_SIZE);
+            let segPts    = [];
+            for (let i = 0; i < chunks.length; i++) {
+                const r = await fetchOSRMRoute(chunks[i]);
+                segPts  = i === 0 ? r : segPts.concat(r.slice(1));
+            }
+            result.push(segPts.length >= 2 ? segPts : seg);
+        }
+        return result;
+    }
+
+    // ─── Track Çizimi ─────────────────────────────────────────────────────────
+
+    function renderSegment(group, pts, color) {
+        if (pts.length < 2) return;
+        const line = L.polyline(pts, {
+            color, weight: 5, opacity: 0.85,
+            lineJoin: 'round', lineCap: 'round'
+        }).addTo(group);
+
+        // Ok işaretleri
+        if (typeof L.polylineDecorator !== 'undefined' && pts.length >= 4) {
+            L.polylineDecorator(line, {
+                patterns: [{
+                    offset: '8%', repeat: 200,
+                    symbol: L.Symbol.arrowHead({
+                        pixelSize: 11, polygon: false,
+                        pathOptions: { color, weight: 2.5, opacity: 0.9, fillOpacity: 1 }
+                    })
+                }]
+            }).addTo(group);
+        }
+    }
+
+    async function redrawTrack(callsign) {
+        if (trackGroups[callsign]) { map.removeLayer(trackGroups[callsign]); delete trackGroups[callsign]; }
+        const pts = rawPoints[callsign] || [];
+        if (pts.length < 2) return;
+
+        setRoutingBadge('busy');
+        const color = getColor(callsign);
+        const group = L.layerGroup();
+        const segs  = await routeAllPoints(pts);
+        segs.forEach(seg => renderSegment(group, seg, color));
+        trackGroups[callsign] = group;
+        
+        const show = (activeFilter === 'ALL' || activeFilter === callsign);
+        if (show) group.addTo(map);
+
+        setRoutingBadge(roadSnap ? 'idle' : 'off');
+    }
+
+    // Canlı paketten yeni segment ekle (yalnızca son iki noktayı route et)
+    async function addLiveSegment(callsign, newLatLng) {
+        const pts = rawPoints[callsign];
+        const show = (activeFilter === 'ALL' || activeFilter === callsign);
+        
+        if (!pts || pts.length === 0) {
+            if (!trackGroups[callsign]) {
+                trackGroups[callsign] = L.layerGroup();
+                if (show) trackGroups[callsign].addTo(map);
+            }
+            return;
+        }
+        const prev = pts[pts.length - 1];
+        const dist = haversineKm(prev[0], prev[1], newLatLng[0], newLatLng[1]);
+        if (dist > MAX_GAP_KM) return; // büyük atlama → segment ekleme
+
+        if (!trackGroups[callsign]) {
+            trackGroups[callsign] = L.layerGroup();
+            if (show) trackGroups[callsign].addTo(map);
+        }
+        const color = getColor(callsign);
+        const seg   = await fetchOSRMRoute([prev, newLatLng]);
+        renderSegment(trackGroups[callsign], seg, color);
+    }
+
+    // ─── Marker ───────────────────────────────────────────────────────────────
+    function getAprsIcon(symbolTable, symbol) {
+        if (!symbolTable || !symbol) return '<i class="fa-solid fa-broadcast-tower"></i>';
+        const fullSymbol = symbolTable + symbol;
+        if (typeof getAPRSSymbolImageTag === 'function') {
+            const tag = getAPRSSymbolImageTag(fullSymbol);
+            if (tag) return tag;
+        }
+        return '<i class="fa-solid fa-broadcast-tower"></i>';
+    }
+
+    function buildIconHTML(callsign, symbolTable, symbol) {
+        const color      = getColor(callsign);
+        const labelClass = isTrackedCallsign(callsign) ? 'tracked' : '';
+        const content    = (symbol && symbolTable)
+            ? getAprsIcon(symbolTable, symbol)
+            : `<i class="fa-solid fa-location-dot" style="color:${color};font-size:18px;"></i>`;
+        return `
+            <div class="aprs-marker-wrapper">
+                <div class="aprs-marker-inner">
+                    <div class="aprs-pulse-ring" style="border-color:${color};"></div>
+                    <div class="aprs-symbol-box">${content}</div>
+                </div>
+                <div class="aprs-marker-label ${labelClass}" style="border-color:${color}33;">${callsign}</div>
+            </div>`;
+    }
+
+    function upsertMarker(callsign, latlng, symbolTable, symbol, popupText) {
+        ensureCallsignOption(callsign);
+        const html    = buildIconHTML(callsign, symbolTable, symbol);
+        const divIcon = L.divIcon({ html, className: '', iconSize: [0,0], iconAnchor: [12,12] });
+        if (!markers[callsign]) {
+            markers[callsign] = L.marker(latlng, { icon: divIcon }).bindPopup(popupText);
+        } else {
+            markers[callsign].setLatLng(latlng).setIcon(divIcon).bindPopup(popupText);
+        }
+        
+        const show = (activeFilter === 'ALL' || activeFilter === callsign);
+        if (show && !map.hasLayer(markers[callsign])) {
+            markers[callsign].addTo(map);
+        } else if (!show && map.hasLayer(markers[callsign])) {
+            map.removeLayer(markers[callsign]);
+        }
+    }
+
+    // ─── Mesaj Kutusu ─────────────────────────────────────────────────────────
+    window.onerror = function(msg, url, lineNo, columnNo, error) {
+        if (!chatContainer) return false;
+        const errDiv = document.createElement('div');
+        errDiv.style.color = 'red';
+        errDiv.style.padding = '10px';
+        errDiv.innerHTML = `<strong>JS Error:</strong> ${msg} <br> Line: ${lineNo}`;
+        chatContainer.appendChild(errDiv);
+        return false;
+    };
+    
+    function updateTargetBar(val) {
+        const bar     = document.getElementById('targetBar');
+        const display = document.getElementById('targetDisplay');
+        const badge   = document.getElementById('target-badge');
+        if (val && val.trim()) {
+            bar.className     = 'target-bar has-target';
+            display.textContent = val.trim().toUpperCase();
+            if (badge) badge.innerText = val.trim().toUpperCase();
+        } else {
+            bar.className     = 'target-bar';
+            display.textContent = 'Seçilmedi';
+            if (badge) badge.innerText = 'Genel İzleme';
+        }
+    }
+
+    function clearTarget() {
+        document.getElementById('target-input').value = '';
+        updateTargetBar('');
         document.getElementById('message-input').focus();
     }
 
-    // ─── Yardımcı: Mesaj Kutusu Ekle ─────────────────────────────────────────
+    function setTarget(callsign) {
+        document.getElementById('target-input').value = callsign;
+        updateTargetBar(callsign);
+        document.getElementById('message-input').focus();
+    }
+
     function appendMessage(sender, receiver, text, isSelf, customTime = null) {
         if (chatPlaceholder) chatPlaceholder.remove();
-
-        const time = customTime || new Date().toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'});
+        const time   = customTime || new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
         const msgDiv = document.createElement('div');
         msgDiv.className = `message-box ${isSelf ? 'self' : 'other'}`;
+
+        const headerRight = isSelf && receiver
+            ? `<span style="display:flex;align-items:center;gap:6px;">
+                   <span style="font-size:0.75rem;opacity:0.8;">→</span>
+                   <strong style="color:#fff;font-size:0.82rem;letter-spacing:0.3px;">${receiver}</strong>
+                   <span style="opacity:0.6;">${time}</span>
+               </span>`
+            : `<span>${time}</span>`;
 
         msgDiv.innerHTML = `
             <div class="message-header">
                 <strong class="${!isSelf ? 'btn-chat-target' : ''}"
-                        onclick="${!isSelf ? `setTarget('${sender}')` : ''}">${sender}</strong>
-                <span>${time}</span>
+                        onclick="${!isSelf ? `setTarget('${sender}')` : ''}">${isSelf ? 'Ben' : sender}</strong>
+                ${headerRight}
             </div>
             <div>${text}</div>
             ${!isSelf && receiver
-                ? `<div style="font-size:0.7rem;color:#888;text-align:right;margin-top:4px;">Hedef: ${receiver}</div>`
-                : ''}
-        `;
-
+                ? `<div style="font-size:0.7rem;color:#aaa;text-align:right;margin-top:4px;">&#8594; ${receiver}</div>`
+                : ''}`;
         chatContainer.appendChild(msgDiv);
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }
 
-    // ─── APRS Simge Eşlemesi ─────────────────────────────────────────────────
-    function getAprsIcon(symbolTable, symbol) {
-        let faClass = 'fa-broadcast-tower';
-        if (symbolTable === '/' || symbolTable === '\\') {
-            const MAP = {
-                '>': 'fa-car',
-                'v': 'fa-van-shuttle',
-                'k': 'fa-truck',
-                'j': 'fa-truck-pickup',
-                '<': 'fa-motorcycle',
-                '[': 'fa-person-running',
-                'Y': 'fa-ship',
-                '-': 'fa-house',
-                '=': 'fa-train',
-                'O': 'fa-parachute-box',
-                'X': 'fa-helicopter',
-                '&': 'fa-tower-broadcast',
-                'I': 'fa-network-wired',
-                'b': 'fa-bicycle',
-                'a': 'fa-truck-medical',
-                's': 'fa-ship',
-                '_': 'fa-cloud',
-            };
-            faClass = MAP[symbol] || faClass;
-        }
-        return `<i class="fa-solid ${faClass}"></i>`;
-    }
+    // ─── Geçmiş Yükle ─────────────────────────────────────────────────────────
+    document.getElementById('historyDate').addEventListener('change', e => loadHistory(e.target.value));
 
-    // ─── Marker Oluştur veya Güncelle ────────────────────────────────────────
-    function buildIconHTML(callsign, symbolTable, symbol) {
-        const tracked      = isTrackedCallsign(callsign);
-        const bgColor      = tracked ? '#ffd700' : '#0dcaf0';
-        const textColor    = '#000';
-        const pulseStyle   = tracked
-            ? `box-shadow:0 0 15px ${bgColor},0 0 5px ${bgColor} inset;animation:blink 1.5s infinite alternate;`
-            : '';
-        const content      = symbol ? getAprsIcon(symbolTable, symbol) : callsign.substring(0, 2);
-
-        return `
-            <div style="display:flex;align-items:center;white-space:nowrap;transform:translate(-10px,-10px);">
-                <div style="color:${bgColor};font-size:20px;text-shadow:1px 1px 2px black;${pulseStyle}">
-                    ${content}
-                </div>
-                <div style="margin-left:4px;background:rgba(0,0,0,0.7);color:white;padding:1px 4px;
-                            border-radius:3px;font-size:11px;font-weight:bold;border:1px solid #444;">
-                    ${callsign}
-                </div>
-            </div>
-        `;
-    }
-
-    function upsertMarker(callsign, latlng, symbolTable, symbol, popupText) {
-        const tracked  = isTrackedCallsign(callsign);
-        const bgColor  = tracked ? '#ffd700' : '#0dcaf0';
-        const iconHTML = buildIconHTML(callsign, symbolTable, symbol);
-        const divIcon  = L.divIcon({ html: iconHTML, className: '', iconSize: [0, 0], iconAnchor: [0, 0] });
-
-        if (!markers[callsign]) {
-            markers[callsign] = L.marker(latlng, { icon: divIcon }).addTo(map);
-            tracks[callsign]  = L.polyline([latlng], { color: bgColor, weight: 2, opacity: 0.8 }).addTo(map);
-        } else {
-            // BUG FIX: Marker varsa ikonunu da güncelle (renk/puls değişebilir)
-            markers[callsign].setLatLng(latlng);
-            markers[callsign].setIcon(divIcon);
-            tracks[callsign].addLatLng(latlng);
-        }
-        markers[callsign].bindPopup(popupText);
-    }
-
-    // ─── Tarih Seçici ────────────────────────────────────────────────────────
-    document.getElementById('historyDate').addEventListener('change', function (e) {
-        loadHistory(e.target.value);
-    });
-
-    // ─── Geçmiş Verileri Yükle ───────────────────────────────────────────────
-    function loadHistory(dateStr) {
-        let url = '/api/history?t=' + new Date().getTime();
+    async function loadHistory(dateStr) {
+        let url = '/api/history?t=' + Date.now();
         if (dateStr) url += '&date=' + dateStr;
 
         // Haritayı temizle
         Object.values(markers).forEach(m => map.removeLayer(m));
-        Object.values(tracks).forEach(t => map.removeLayer(t));
         Object.keys(markers).forEach(k => delete markers[k]);
-        Object.keys(tracks).forEach(k => delete tracks[k]);
+        Object.values(trackGroups).forEach(g => { if (g) map.removeLayer(g); });
+        Object.keys(trackGroups).forEach(k => delete trackGroups[k]);
+        Object.keys(rawPoints).forEach(k => delete rawPoints[k]);
+        Object.keys(routeCache).forEach(k => delete routeCache[k]); // cache temizle
         chatContainer.innerHTML = '';
 
-        fetch(url)
-            .then(r => r.json())
-            .then(data => {
-                if (data.status !== 'success') return;
+        try {
+            const r    = await fetch(url);
+            const data = await r.json();
+            if (data.status !== 'success') return;
 
-                // Konum geçmişi
-                data.locations.forEach(loc => {
-                    const latlng   = [loc.lat, loc.lon];
-                    const callsign = loc.callsign;
-                    const lastSeen = new Date(loc.timestamp * 1000).toLocaleString('tr-TR');
+        const filterSelect = document.getElementById('callsignFilter');
+        filterSelect.innerHTML = '<option value="ALL">Tüm Araçlar</option>';
+        activeFilter = 'ALL';
 
-                    let popupText  = `<strong>${callsign}</strong><br>`;
-                    if (loc.comment) popupText += `<small class="text-muted">${loc.comment}</small><br>`;
-                    popupText += `<small class="text-muted">Son Görülme: ${lastSeen}</small><br>`;
-                    popupText += `<button class="btn btn-sm btn-info mt-2 w-100" onclick="setTarget('${callsign}')">
-                                    <i class="fa-solid fa-comment"></i> Mesaj Yaz
-                                  </button>`;
+        // Callsign'a göre grupla
+        const byCallsign = {};
+        data.locations.forEach(loc => {
+                if (!byCallsign[loc.callsign]) byCallsign[loc.callsign] = [];
+                byCallsign[loc.callsign].push(loc);
+            });
 
-                    upsertMarker(callsign, latlng, loc.symbol_table, loc.symbol, popupText);
-                });
+            for (const [callsign, locs] of Object.entries(byCallsign)) {
+                locs.sort((a, b) => a.timestamp - b.timestamp);
+                rawPoints[callsign] = locs.map(l => [l.lat, l.lon]);
 
-                // Mesaj geçmişi
-                data.messages.forEach(msg => {
-                    const customTime = new Date(msg.timestamp * 1000)
-                        .toLocaleTimeString('tr-TR', {hour: '2-digit', minute: '2-digit'});
-                    const isSelf = msg.sender.toUpperCase().startsWith(MY_CALLSIGN.split('-')[0].toUpperCase());
-                    appendMessage(msg.sender, msg.receiver, msg.message_text, isSelf, customTime);
-                });
-            })
-            .catch(err => console.error('loadHistory error:', err));
+                const last     = locs[locs.length - 1];
+                const latlng   = [last.lat, last.lon];
+                const lastSeen = new Date(last.timestamp * 1000).toLocaleString('tr-TR');
+
+                const popupText = `
+                    <strong>${callsign}</strong><br>
+                    ${last.comment ? `<small class="text-muted">${last.comment}</small><br>` : ''}
+                    <small class="text-muted">Son Görülme: ${lastSeen}</small><br>
+                    <button class="btn btn-sm btn-info mt-2 w-100" onclick="setTarget('${callsign}')">
+                        <i class="fa-solid fa-comment"></i> Mesaj Yaz
+                    </button>`;
+
+                upsertMarker(callsign, latlng, last.symbol_table, last.symbol, popupText);
+                await redrawTrack(callsign);
+            }
+
+            // Mesajlar
+            data.messages.forEach(msg => {
+                const t      = new Date(msg.timestamp * 1000).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+                const isSelf = msg.sender.toUpperCase().startsWith(MY_CALLSIGN.split('-')[0].toUpperCase());
+                appendMessage(msg.sender, msg.receiver, msg.message_text, isSelf, t);
+            });
+        } catch (err) {
+            console.error('loadHistory error:', err);
+            const errDiv = document.createElement('div');
+            errDiv.style.color = '#ff5252';
+            errDiv.style.padding = '10px';
+            errDiv.style.fontSize = '0.85rem';
+            errDiv.innerHTML = `<strong>Geçmiş yükleme hatası:</strong> ${err.message || err}`;
+            chatContainer.appendChild(errDiv);
+        }
     }
 
-    // Sayfa yüklenince bugünü seç ve yükle
     document.getElementById('historyDate').valueAsDate = new Date();
     loadHistory(document.getElementById('historyDate').value);
 
-    // ─── Canlı APRS Paket İşleme ─────────────────────────────────────────────
+    // ─── Canlı APRS Paket ─────────────────────────────────────────────────────
     socket.on('connect', () => console.log('Sunucuya bağlanıldı!'));
 
-    socket.on('aprs_packet', (packet) => {
+    socket.on('aprs_packet', async (packet) => {
         const callsign = packet.from;
         if (!callsign) return;
 
-        // Konum varsa haritaya ekle
         if (packet.latitude && packet.longitude) {
-            const latlng = [packet.latitude, packet.longitude];
+            const latlng    = [packet.latitude, packet.longitude];
+            const popupText = `
+                <strong>${callsign}</strong><br>
+                ${packet.comment ? `<small class="text-muted">${packet.comment}</small><br>` : ''}
+                <button class="btn btn-sm btn-info mt-2 w-100" onclick="setTarget('${callsign}')">
+                    <i class="fa-solid fa-comment"></i> Mesaj Yaz
+                </button>`;
 
-            let popupText = `<strong>${callsign}</strong><br>`;
-            if (packet.comment) popupText += `<small class="text-muted">${packet.comment}</small><br>`;
-            popupText += `<button class="btn btn-sm btn-info mt-2 w-100" onclick="setTarget('${callsign}')">
-                            <i class="fa-solid fa-comment"></i> Mesaj Yaz
-                          </button>`;
-
+            await addLiveSegment(callsign, latlng);
+            if (!rawPoints[callsign]) rawPoints[callsign] = [];
+            rawPoints[callsign].push(latlng);
             upsertMarker(callsign, latlng, packet.symbol_table, packet.symbol, popupText);
         }
 
-        // Mesaj paketi
         if (packet.format === 'message') {
             const receiver = (packet.addresse || '').trim();
             let text       = (packet.message_text || '').trim();
-
             if (!text && packet.response) {
                 if      (packet.response === 'ack') text = `✅ [İletildi - ACK] Mesaj No: ${packet.msgNo || ''}`;
                 else if (packet.response === 'rej') text = `❌ [Reddedildi - REJ] Mesaj No: ${packet.msgNo || ''}`;
                 else                                text = `[Sistem: ${packet.response}]`;
             }
-
             appendMessage(callsign, receiver, text, false);
         }
     });
 
     // ─── Mesaj Gönderme ───────────────────────────────────────────────────────
-    document.getElementById('message-form').addEventListener('submit', (e) => {
+    document.getElementById('message-form').addEventListener('submit', e => {
         e.preventDefault();
         const target   = document.getElementById('target-input').value.trim();
         const msgInput = document.getElementById('message-input');
         const text     = msgInput.value.trim();
-
         if (!target) { alert('Lütfen hedefin çağrı işaretini girin!'); return; }
-        if (!text)   return;
-
+        if (!text) return;
         appendMessage('Ben', target, text, true);
-
-        socket.emit('send_message', { target, message: text }, (response) => {
-            if (response && response.status === 'error') {
-                alert('Mesaj Gönderilemedi: ' + response.message);
-            }
+        socket.emit('send_message', { target, message: text }, (resp) => {
+            if (resp?.status === 'error') alert('Mesaj Gönderilemedi: ' + resp.message);
         });
-
         msgInput.value = '';
     });
 
     // ─── Ayarlar ──────────────────────────────────────────────────────────────
     function loadSettings() {
-        fetch('/api/settings')
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    document.getElementById('trackedCallsigns').value =
-                        data.tracked_callsigns.join(', ');
-                }
-            })
-            .catch(err => console.error('Ayarlar yüklenemedi:', err));
+        fetch('/api/settings').then(r => r.json()).then(data => {
+            if (data.status === 'success')
+                document.getElementById('trackedCallsigns').value = data.tracked_callsigns.join(', ');
+        }).catch(err => console.error('Ayarlar yüklenemedi:', err));
     }
 
     function saveSettings() {
-        const input     = document.getElementById('trackedCallsigns').value;
-        const callsigns = input.split(',').map(c => c.trim()).filter(c => c);
-
+        const callsigns = document.getElementById('trackedCallsigns').value
+            .split(',').map(c => c.trim()).filter(c => c);
         fetch('/api/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tracked_callsigns: callsigns })
-        })
-        .then(r => r.json())
-        .then(data => {
+        }).then(r => r.json()).then(data => {
             if (data.status === 'success') {
                 alert(data.message);
                 const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
@@ -503,8 +898,7 @@
             } else {
                 alert('Hata: ' + data.message);
             }
-        })
-        .catch(() => alert('Ayarlar kaydedilemedi!'));
+        }).catch(() => alert('Ayarlar kaydedilemedi!'));
     }
 </script>
 </body>
