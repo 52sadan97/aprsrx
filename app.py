@@ -241,11 +241,17 @@ def process_parsed_packet(packet):
                         msg_text  = "Korgan'a Hosgeldiniz! Iletisim: +905314913916"
                         pkt_raw   = f"{my_callsign}>APRS,TCPIP*::{target_padded}:{msg_text}"
                         
-                        # Kendi ağımızdaki TCP istemcilerine gönder (Global'e atmıyoruz)
+                        # Kendi ağımızdaki TCP istemcilerine gönder
                         for client_fd in tcp_clients:
                             try:
                                 client_fd.write(pkt_raw + "\r\n")
                                 client_fd.flush()
+                            except: pass
+                            
+                        # Global APRS ağına da gönder
+                        if AIS:
+                            try:
+                                AIS.sendall(pkt_raw)
                             except: pass
                             
                         print(f"✅ Hoşgeldin → {pkt_callsign} ({dist:.1f}km): {pkt_raw}")
