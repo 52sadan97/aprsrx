@@ -158,11 +158,20 @@ def haversine_distance(lat1, lon1, lat2, lon2):
 def build_filter(callsign, tracked):
     """
     APRS-IS buddy-list filtresi oluşturur.
-    Tracked boş olsa bile en azından kendi callsign'imizi izleriz.
+    - b/TA7KES* → TA7KES, TA7KES-1 ... TA7KES-15 tümünü yakalar
+    - b/ filtresi hem FROM hem de TO (addresse) alanını tarar → gelen mesajlar da gelir
     """
     buddylist = [callsign] + [cs for cs in tracked if cs]
-    # Yıldız varsa zaten APRS-IS prefix eşleşmesi yapıyor, olduğu gibi bırak
-    filter_str = "b/" + "/".join(buddylist)
+    # Her callsign'in base kısmına '*' ekle → tüm SSID varyantları yakalanır
+    seen = set()
+    filter_parts = []
+    for cs in buddylist:
+        base = cs.split('-')[0].upper()
+        wildcard = base + '*'
+        if wildcard not in seen:
+            seen.add(wildcard)
+            filter_parts.append(wildcard)
+    filter_str = "b/" + "/".join(filter_parts)
     return filter_str
 
 def aprs_listener():
@@ -192,7 +201,7 @@ def aprs_listener():
             def process_packet(packet):
                 pkt_callsign = packet.get('from', '')
 
-                # --- Filtreleme: Sadece takip listesi + kendi callsign ---
+                # --- Filtreleme ---
                 cfg_now = load_config()
                 my_callsign = cfg_now.get("aprs", {}).get("callsign", "NOCALL")
                 tracked_now = cfg_now.get('tracked_callsigns', [])
@@ -200,6 +209,8 @@ def aprs_listener():
 
                 # SSID'siz eşleşme: TA7KES-9 listede TA7KES varsa da kabul et
                 def matches_any(cs, allowed_list):
+                    if not cs:
+                        return False
                     cs_base = cs.split('-')[0].upper()
                     for a in allowed_list:
                         a_base = a.split('-')[0].upper()
@@ -207,8 +218,14 @@ def aprs_listener():
                             return True
                     return False
 
-                if not matches_any(pkt_callsign, allowed):
-                    return  # İzin verilmeyen istasyon, yoksay
+                # Göndericisi takip listesinde VEYA alıcısı takip listesinde olan paketi kabul et
+                # Böylece TA7KES'e gönderilen mesajlar, gönderici kim olursa olsun görünür
+                pkt_receiver = str(packet.get('addresse') or '').strip()
+                is_from_tracked = matches_any(pkt_callsign, allowed)
+                is_to_tracked   = matches_any(pkt_receiver, allowed)
+
+                if not is_from_tracked and not is_to_tracked:
+                    return  # Ne göndericisi ne alıcısı takip listesinde, yoksay
 
                 # Parse edilmiş paketi web istemcilerine yolla
                 socketio.emit('aprs_packet', packet)
