@@ -255,15 +255,15 @@ def process_parsed_packet(packet):
                             except: pass
                             
                         print(f"✅ Hoşgeldin → {pkt_callsign} ({dist:.1f}km): {pkt_raw}")
-                            cw.execute(
-                                "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
-                                (my_callsign, pkt_callsign, f"[Sistem-Oto] {msg_text}", now)
-                            )
-                            cw.execute(
-                                "INSERT OR REPLACE INTO welcome_history (callsign, timestamp) VALUES (?, ?)",
-                                (pkt_callsign, now)
-                            )
-                            conn_w.commit()
+                        cw.execute(
+                            "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
+                            (my_callsign, pkt_callsign, f"[Sistem-Oto] {msg_text}", now)
+                        )
+                        cw.execute(
+                            "INSERT OR REPLACE INTO welcome_history (callsign, timestamp) VALUES (?, ?)",
+                            (pkt_callsign, now)
+                        )
+                        conn_w.commit()
                     conn_w.close()
                 except Exception as e:
                     print(f"Hoşgeldin gönderim hatası: {e}")
