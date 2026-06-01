@@ -239,10 +239,16 @@ def process_parsed_packet(packet):
                     if not row or (now - row[0]) > 86400:
                         target_padded = pkt_callsign.ljust(9)
                         msg_text  = "Korgan'a Hosgeldiniz! Iletisim: +905314913916"
-                        pkt_raw   = f"{my_callsign}>APRS::{target_padded}:{msg_text}"
-                        if AIS:
-                            AIS.sendall(pkt_raw)
-                            print(f"✅ Hoşgeldin → {pkt_callsign} ({dist:.1f}km): {pkt_raw}")
+                        pkt_raw   = f"{my_callsign}>APRS,TCPIP*::{target_padded}:{msg_text}"
+                        
+                        # Kendi ağımızdaki TCP istemcilerine gönder (Global'e atmıyoruz)
+                        for client_fd in tcp_clients:
+                            try:
+                                client_fd.write(pkt_raw + "\r\n")
+                                client_fd.flush()
+                            except: pass
+                            
+                        print(f"✅ Hoşgeldin → {pkt_callsign} ({dist:.1f}km): {pkt_raw}")
                             cw.execute(
                                 "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
                                 (my_callsign, pkt_callsign, f"[Sistem-Oto] {msg_text}", now)
@@ -378,20 +384,13 @@ def handle_tcp_client(sock, address):
             if not line or line.startswith('#'): continue
             
             try:
-                # Diğer TCP istemcilerine gönder (Kendisi hariç)
+                # SADECE kendi sunucumuza bağlı TCP istemcilerine gönder (Kendisi hariç)
                 for client_fd in tcp_clients:
                     if client_fd != fd:
                         try:
                             client_fd.write(line + "\r\n")
                             client_fd.flush()
                         except: pass
-                
-                # Global APRS-IS'e gönder (Eğer bağlıysa)
-                if AIS:
-                    try:
-                        AIS.sendall(line)
-                    except Exception as e:
-                        print(f"[{address[0]}:{address[1]}] AIS forward hatası: {e}")
 
                 packet = aprslib.parse(line)
                 process_parsed_packet(packet)
@@ -542,38 +541,34 @@ def handle_send_message(data):
     
     my_call = config.get("aprs", {}).get("callsign", "N0CALL")
     
-    # APRS-IS üzerinden gönder
-    if AIS:
-        target_padded = target.ljust(9)[:9]
-        packet_raw = f"{my_call}>APRS,TCPIP*::{target_padded}:{msg}"
-        try:
-            AIS.sendall(packet_raw)
-            print(f"Mesaj Gönderildi: {packet_raw}")
-            
-            now = time.time()
-            conn = sqlite3.connect(DB_FILE)
-            c = conn.cursor()
-            c.execute(
-                "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
-                (my_call, target, msg, now)
-            )
-            conn.commit()
-            conn.close()
-            
-            # Aynı zamanda bağlı TCP istemcilerine (APRSdroid vb.) yankıla (echo)
-            for client_fd in tcp_clients:
-                try:
-                    client_fd.write(packet_raw + "\r\n")
-                    client_fd.flush()
-                except Exception as e:
-                    print(f"[Echo] TCP istemcisine mesaj gönderilirken hata: {e}")
-            
-            return {"status": "success", "packet": packet_raw}
-        except Exception as e:
-            print(f"Mesaj Gönderim Hatası: {e}")
-            return {"status": "error", "message": str(e)}
-    else:
-        return {"status": "error", "message": "APRS sunucusuna bağlı değil"}
+    # SADECE kendi ağımızdaki TCP istemcilerine gönder (Global APRS ağına gitmez)
+    target_padded = target.ljust(9)[:9]
+    packet_raw = f"{my_call}>APRS,TCPIP*::{target_padded}:{msg}"
+    
+    try:
+        now = time.time()
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
+            (my_call, target, msg, now)
+        )
+        conn.commit()
+        conn.close()
+        
+        # Bağlı TCP istemcilerine yankıla (echo)
+        for client_fd in tcp_clients:
+            try:
+                client_fd.write(packet_raw + "\r\n")
+                client_fd.flush()
+            except Exception as e:
+                print(f"[Echo] TCP istemcisine mesaj gönderilirken hata: {e}")
+        
+        print(f"Mesaj Gönderildi (Sadece Yerel Ağ): {packet_raw}")
+        return {"status": "success", "packet": packet_raw}
+    except Exception as e:
+        print(f"Mesaj Gönderim Hatası: {e}")
+        return {"status": "error", "message": str(e)}
 
 @socketio.on('private_location')
 def handle_private_location(data):
