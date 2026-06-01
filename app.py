@@ -530,7 +530,7 @@ def handle_send_message(data):
     # APRS-IS üzerinden gönder
     if AIS:
         target_padded = target.ljust(9)[:9]
-        packet_raw = f"{my_call}>APRS::{target_padded}:{msg}"
+        packet_raw = f"{my_call}>APRS,TCPIP*::{target_padded}:{msg}"
         try:
             AIS.sendall(packet_raw)
             print(f"Mesaj Gönderildi: {packet_raw}")
