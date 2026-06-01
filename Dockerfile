@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Web sunucusu için portu açın (config.json içindeki port)
-EXPOSE 6061
+EXPOSE 14580
 
 # Konteyner başladığında app.py'yi çalıştırın
 CMD ["python", "-u", "app.py"]
