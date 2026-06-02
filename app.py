@@ -239,7 +239,7 @@ def process_parsed_packet(packet):
                     # 24 saatte bir kez gönder
                     if not row or (now - row[0]) > 86400:
                         target_padded = pkt_callsign.ljust(9)
-                        msg_text  = "Korgan'a Hosgeldiniz! Iletisim: +905314913916"
+                        msg_text  = "Korgan'a Hosgeldiniz! TA7KES Op. Ertugrul Iletisim: +905314913916"
                         pkt_raw   = f"{my_callsign}>APRS,TCPIP*::{target_padded}:{msg_text}"
                         
                         # Kendi ağımızdaki TCP istemcilerine gönder
