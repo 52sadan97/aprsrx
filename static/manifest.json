@@ -1,0 +1,17 @@
+{
+  "name": "APRSRX",
+  "short_name": "APRSRX",
+  "description": "APRS Canlı Harita ve Mesajlaşma Sistemi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a12",
+  "theme_color": "#0a0a12",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

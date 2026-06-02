@@ -19,6 +19,8 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- APRS Symbols -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/OK-DMR/aprs-symbols@master/aprs-symbols.css" />
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
 
     <style>
         /* ═══════════════════════════════════════════════════
@@ -1859,6 +1861,17 @@
                 alert('Hata: ' + data.message);
             }
         }).catch(() => alert('Ayarlar kaydedilemedi!'));
+    }
+
+    // Service Worker Kaydı (PWA)
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(reg => {
+                console.log('ServiceWorker registered:', reg.scope);
+            }).catch(err => {
+                console.log('ServiceWorker registration failed:', err);
+            });
+        });
     }
 </script>
 </body>

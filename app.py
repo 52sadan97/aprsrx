@@ -4,7 +4,7 @@ os.environ['EVENTLET_NO_GREENDNS'] = 'yes'
 import eventlet
 eventlet.monkey_patch()
 
-from flask import Flask, render_template, request, Response, session, redirect, url_for
+from flask import Flask, render_template, request, Response, session, redirect, url_for, send_from_directory, make_response
 from flask_socketio import SocketIO
 import aprslib
 import json
@@ -464,6 +464,16 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+@app.route('/manifest.json')
+def manifest():
+    return send_from_directory('static', 'manifest.json')
+
+@app.route('/sw.js')
+def service_worker():
+    response = make_response(send_from_directory('static', 'sw.js'))
+    response.headers['Cache-Control'] = 'no-cache'
+    return response
 
 @app.route('/')
 @login_required
