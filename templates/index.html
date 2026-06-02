@@ -1,13 +1,18 @@
 <!DOCTYPE html>
-<html lang="tr" data-bs-theme="dark">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>APRSRX - Canlı Radar &amp; Mesajlaşma</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0a12">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="APRSRX — APRS Canlı Harita, Araç Takip ve Mesajlaşma Sistemi">
+    <title>APRSRX — Canlı Harita</title>
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%2342a5f5' d='M432 208H80c-26.5 0-48 21.5-48 48v160c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V256c0-26.5-21.5-48-48-48zm-176 96c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64z'/%3E%3C/svg%3E">
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%2300d4ff' d='M432 208H80c-26.5 0-48 21.5-48 48v160c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V256c0-26.5-21.5-48-48-48zm-176 96c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64z'/%3E%3C/svg%3E">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- FontAwesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- Leaflet CSS -->
@@ -16,153 +21,261 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/OK-DMR/aprs-symbols@master/aprs-symbols.css" />
 
     <style>
+        /* ═══════════════════════════════════════════════════
+           DESIGN TOKENS
+           ═══════════════════════════════════════════════════ */
+        :root {
+            --bg-primary: #0a0a12;
+            --bg-card: rgba(16, 18, 30, 0.92);
+            --bg-glass: rgba(255, 255, 255, 0.04);
+            --bg-glass-hover: rgba(255, 255, 255, 0.08);
+            --bg-input: rgba(255, 255, 255, 0.06);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-focus: rgba(0, 212, 255, 0.5);
+            --accent: #00d4ff;
+            --accent-dim: rgba(0, 212, 255, 0.15);
+            --accent-glow: rgba(0, 212, 255, 0.3);
+            --accent-secondary: #7b61ff;
+            --success: #00e676;
+            --warning: #ffab00;
+            --danger: #ff5252;
+            --text-primary: #f0f0f5;
+            --text-secondary: rgba(255, 255, 255, 0.5);
+            --text-muted: rgba(255, 255, 255, 0.3);
+            --radius-xs: 6px;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+            --radius-full: 9999px;
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+            --shadow-md: 0 8px 32px rgba(0,0,0,0.4);
+            --shadow-lg: 0 16px 48px rgba(0,0,0,0.5);
+            --shadow-glow: 0 0 20px var(--accent-glow);
+            --navbar-h: 56px;
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         body, html {
             height: 100%;
-            margin: 0;
-            background-color: #121212;
-            color: #e0e0e0;
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
             overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
-        .navbar {
-            background: linear-gradient(90deg, #1e1e1e 0%, #2d2d2d 100%);
-            border-bottom: 1px solid #333;
+
+        /* ═══════════════════════════════════════════════════
+           NAVBAR
+           ═══════════════════════════════════════════════════ */
+        .app-navbar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--navbar-h);
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
             z-index: 1000;
+            gap: 8px;
         }
-        .navbar-brand {
-            color: #0dcaf0 !important;
-            font-weight: bold;
-            letter-spacing: 1px;
-        }
-        #map {
-            height: calc(100vh - 56px);
-            width: 100%;
-            z-index: 1;
-        }
-        #sidebar {
-            height: calc(100vh - 56px);
-            background-color: #1e1e1e;
-            border-left: 1px solid #333;
-            display: flex;
-            flex-direction: column;
-        }
-        .chat-header {
-            background-color: #252526;
-            padding: 15px;
-            border-bottom: 1px solid #333;
-            font-weight: bold;
-        }
-        .chat-messages {
-            flex-grow: 1;
-            padding: 15px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .message-box {
-            background-color: #2d2d2d;
-            border-radius: 8px;
-            padding: 10px;
-            font-size: 0.9rem;
-            position: relative;
-        }
-        .message-box.self {
-            background-color: #0d6efd;
-            color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 0;
-        }
-        .message-box.other {
-            background-color: #333;
-            align-self: flex-start;
-            border-bottom-left-radius: 0;
-            border-left: 3px solid #0dcaf0;
-        }
-        .message-header {
-            font-size: 0.8rem;
-            color: #aaa;
-            margin-bottom: 4px;
-            display: flex;
-            justify-content: space-between;
-        }
-        .message-box.self .message-header {
-            color: #ddd;
-        }
-        .chat-input-area {
-            padding: 15px;
-            background-color: #252526;
-            border-top: 1px solid #333;
-        }
-        /* ─── Hedef Göstergesi ─────────────────────────────── */
-        .target-bar {
+
+        .nav-brand {
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 7px 10px;
-            border-radius: 8px;
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.08);
-            margin-bottom: 2px;
-            font-size: 0.82rem;
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            text-decoration: none;
         }
-        .target-bar.has-target {
-            background: rgba(41,121,255,0.08);
-            border-color: rgba(41,121,255,0.3);
-        }
-        .target-bar .target-label {
-            color: #666;
+        .nav-brand i { font-size: 1.1rem; }
+
+        .nav-live {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.72rem;
+            color: var(--text-secondary);
             white-space: nowrap;
         }
-        .target-bar .target-callsign {
-            font-weight: 700;
-            font-size: 0.88rem;
-            color: #2979ff;
-            letter-spacing: 0.5px;
-        }
-        .target-bar .target-clear {
-            margin-left: auto;
-            color: #555;
-            cursor: pointer;
-            font-size: 0.75rem;
-            padding: 1px 5px;
-            border-radius: 3px;
-            transition: color 0.2s;
-        }
-        .target-bar .target-clear:hover { color: #e53935; }
-        .form-control {
-            background-color: #2d2d2d;
-            border: 1px solid #444;
-            color: #fff;
-        }
-        .form-control:focus {
-            background-color: #333;
-            border-color: #0dcaf0;
-            color: #fff;
-            box-shadow: none;
-        }
-        .btn-info {
-            background-color: #0dcaf0;
-            border-color: #0dcaf0;
-            color: #000;
-        }
-        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-            background-color: #1e1e1e;
-            color: #e0e0e0;
-        }
-        .btn-chat-target {
-            cursor: pointer;
-            color: #0dcaf0;
-            text-decoration: underline;
-        }
-        @keyframes blink {
-            from { opacity: 0.7; transform: scale(1); }
-            to   { opacity: 1;   transform: scale(1.1); }
-        }
         .live-dot {
-            animation: blink 1.5s infinite alternate;
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: livePulse 2s ease-in-out infinite;
+        }
+        @keyframes livePulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,230,118,0.4); }
+            50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(0,230,118,0); }
         }
 
-        /* ─── APRS Marker Animasyonları ──────────────────────── */
+        .nav-spacer { flex: 1; }
+
+        .nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Desktop-only controls */
+        .nav-desktop-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-input {
+            background: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            padding: 6px 10px;
+            font-size: 0.78rem;
+            font-family: var(--font);
+            outline: none;
+            transition: border-color var(--transition);
+            width: 130px;
+        }
+        .nav-input:focus {
+            border-color: var(--border-focus);
+        }
+        select.nav-input {
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            padding-right: 24px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+        }
+
+        .nav-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px; height: 36px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-glass);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition);
+            font-size: 0.85rem;
+        }
+        .nav-btn:hover {
+            background: var(--bg-glass-hover);
+            color: var(--text-primary);
+            border-color: rgba(255,255,255,0.15);
+        }
+        .nav-btn:active { transform: scale(0.92); }
+
+        .routing-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            padding: 5px 10px;
+            border-radius: var(--radius-full);
+            background: var(--accent-dim);
+            border: 1px solid rgba(0,212,255,0.3);
+            color: var(--accent);
+            cursor: pointer;
+            transition: all var(--transition);
+            white-space: nowrap;
+            user-select: none;
+        }
+        .routing-badge:hover { background: rgba(0,212,255,0.25); }
+        .routing-badge:active { transform: scale(0.95); }
+        .routing-badge.routing-busy {
+            background: rgba(255,171,0,0.12);
+            border-color: rgba(255,171,0,0.35);
+            color: var(--warning);
+        }
+        .routing-badge.routing-off {
+            opacity: 0.45;
+            background: var(--bg-glass);
+            border-color: var(--border-subtle);
+            color: var(--text-muted);
+        }
+
+        /* ═══════════════════════════════════════════════════
+           MAP
+           ═══════════════════════════════════════════════════ */
+        #map {
+            position: fixed;
+            top: var(--navbar-h);
+            left: 0; right: 0; bottom: 0;
+            z-index: 1;
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-card) !important;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md) !important;
+            box-shadow: var(--shadow-md) !important;
+            padding: 0 !important;
+        }
+        .leaflet-popup-content {
+            margin: 14px !important;
+            font-family: var(--font) !important;
+            font-size: 0.85rem !important;
+            line-height: 1.5;
+        }
+        .leaflet-popup-tip {
+            background: var(--bg-card) !important;
+            border: 1px solid var(--border-subtle);
+        }
+        .popup-callsign {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--accent);
+            margin-bottom: 4px;
+        }
+        .popup-comment {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .popup-time {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .popup-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+            padding: 8px;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: var(--accent);
+            color: #000;
+            font-weight: 600;
+            font-size: 0.8rem;
+            font-family: var(--font);
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+        .popup-btn:hover { filter: brightness(1.15); }
+
+        /* ═══════════════════════════════════════════════════
+           APRS MARKER STYLES
+           ═══════════════════════════════════════════════════ */
         @keyframes aprsRingPulse {
             0%   { transform: translate(-50%,-50%) scale(0.4); opacity: 1; }
             100% { transform: translate(-50%,-50%) scale(2.8); opacity: 0; }
@@ -175,8 +288,7 @@
         }
         .aprs-marker-inner {
             position: relative;
-            width: 24px;
-            height: 24px;
+            width: 24px; height: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -184,203 +296,932 @@
         }
         .aprs-pulse-ring {
             position: absolute;
-            width: 34px;
-            height: 34px;
+            width: 34px; height: 34px;
             border-radius: 50%;
             border: 2px solid;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%,-50%) scale(0.4);
             animation: aprsRingPulse 2.2s ease-out infinite;
             pointer-events: none;
         }
         .aprs-symbol-box {
-            width: 24px;
-            height: 24px;
+            width: 24px; height: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
         .aprs-symbol-box img {
-            width: 24px;
-            height: 24px;
+            width: 24px; height: 24px;
             image-rendering: pixelated;
         }
         .aprs-marker-label {
             margin-left: 6px;
-            background: rgba(0,0,0,0.78);
+            background: rgba(10,10,18,0.88);
             color: #ffffff;
-            padding: 2px 7px;
-            border-radius: 4px;
+            padding: 2px 8px;
+            border-radius: var(--radius-xs);
             font-size: 11px;
             font-weight: 700;
-            border: 1px solid rgba(255,255,255,0.12);
-            letter-spacing: 0.3px;
+            font-family: var(--font);
+            border: 1px solid rgba(255,255,255,0.1);
+            letter-spacing: 0.4px;
+            backdrop-filter: blur(8px);
         }
         .aprs-marker-label.tracked {
-            color: #42a5f5;
-            border-color: rgba(66,165,245,0.45);
-            text-shadow: 0 0 8px rgba(66,165,245,0.4);
+            color: var(--accent);
+            border-color: rgba(0,212,255,0.35);
+            text-shadow: 0 0 8px rgba(0,212,255,0.3);
         }
 
-        /* ─── Routing Badge ──────────────────────────────────── */
-        .routing-badge {
+        /* ═══════════════════════════════════════════════════
+           SIDEBAR (DESKTOP)
+           ═══════════════════════════════════════════════════ */
+        .sidebar {
+            position: fixed;
+            top: var(--navbar-h);
+            right: 0;
+            width: 360px;
+            bottom: 0;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-left: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            z-index: 500;
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .sidebar-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .sidebar-header-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .sidebar-header-title i { color: var(--accent); }
+        .sidebar-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .badge-target {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            font-size: 0.7rem;
-            padding: 3px 9px;
-            border-radius: 20px;
-            background: rgba(33,150,243,0.15);
-            border: 1px solid rgba(33,150,243,0.35);
-            color: #42a5f5;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: var(--radius-full);
+            background: var(--bg-glass);
+            border: 1px solid var(--border-subtle);
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .badge-target.active {
+            background: var(--accent-dim);
+            border-color: rgba(0,212,255,0.3);
+            color: var(--accent);
+        }
+
+        /* ═══════════════════════════════════════════════════
+           CHAT MESSAGES
+           ═══════════════════════════════════════════════════ */
+        .chat-messages {
+            flex: 1;
+            padding: 12px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+        .chat-messages::-webkit-scrollbar { width: 4px; }
+        .chat-messages::-webkit-scrollbar-track { background: transparent; }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+        }
+
+        .chat-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            text-align: center;
+        }
+        .chat-placeholder i { font-size: 28px; opacity: 0.4; }
+
+        .message-box {
+            padding: 10px 14px;
+            border-radius: var(--radius-md);
+            font-size: 0.85rem;
+            line-height: 1.5;
+            max-width: 88%;
+            animation: msgIn 0.25s ease-out;
+        }
+        @keyframes msgIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .message-box.self {
+            background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(123,97,255,0.15));
+            border: 1px solid rgba(0,212,255,0.2);
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .message-box.other {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-subtle);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            border-left: 3px solid var(--accent);
+        }
+        .message-header {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .message-box.self .message-header { color: rgba(255,255,255,0.5); }
+        .message-sender {
+            font-weight: 600;
+            color: var(--accent);
             cursor: pointer;
-            transition: all 0.2s;
+        }
+        .message-box.self .message-sender { color: rgba(255,255,255,0.7); cursor: default; }
+
+        /* ═══════════════════════════════════════════════════
+           CHAT INPUT
+           ═══════════════════════════════════════════════════ */
+        .chat-input-area {
+            padding: 12px;
+            border-top: 1px solid var(--border-subtle);
+            background: rgba(10,10,18,0.6);
+            flex-shrink: 0;
+        }
+
+        .target-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-glass);
+            border: 1px solid var(--border-subtle);
+            margin-bottom: 8px;
+            font-size: 0.78rem;
+            transition: all var(--transition);
+        }
+        .target-bar.has-target {
+            background: var(--accent-dim);
+            border-color: rgba(0,212,255,0.25);
+        }
+        .target-bar .target-label { color: var(--text-muted); white-space: nowrap; }
+        .target-bar .target-callsign {
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.4px;
+        }
+        .target-bar .target-clear {
+            margin-left: auto;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: color var(--transition);
+            display: flex;
+            align-items: center;
+        }
+        .target-bar .target-clear:hover { color: var(--danger); }
+
+        .chat-form {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .chat-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-family: var(--font);
+            outline: none;
+            transition: border-color var(--transition);
+        }
+        .chat-input:focus {
+            border-color: var(--border-focus);
+        }
+        .chat-input::placeholder { color: var(--text-muted); }
+
+        .chat-send-row {
+            display: flex;
+            gap: 6px;
+        }
+        .chat-send-row .chat-input { flex: 1; }
+
+        .btn-send {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: var(--accent);
+            color: #000;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all var(--transition);
+            flex-shrink: 0;
+        }
+        .btn-send:hover { filter: brightness(1.15); box-shadow: var(--shadow-glow); }
+        .btn-send:active { transform: scale(0.92); }
+
+        /* ═══════════════════════════════════════════════════
+           FAB (MOBILE CHAT TOGGLE)
+           ═══════════════════════════════════════════════════ */
+        .fab-chat {
+            display: none;
+            position: fixed;
+            bottom: 24px;
+            right: 16px;
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+            color: #fff;
+            border: none;
+            font-size: 1.3rem;
+            cursor: pointer;
+            z-index: 600;
+            box-shadow: 0 4px 20px rgba(0,212,255,0.4);
+            transition: all var(--transition);
+            align-items: center;
+            justify-content: center;
+        }
+        .fab-chat:active { transform: scale(0.9); }
+        .fab-chat .fab-badge {
+            position: absolute;
+            top: -2px; right: -2px;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            background: var(--danger);
+            color: #fff;
+            font-size: 0.6rem;
+            font-weight: 700;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ═══════════════════════════════════════════════════
+           BOTTOM SHEET (MOBILE)
+           ═══════════════════════════════════════════════════ */
+        .bottom-sheet-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 700;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .bottom-sheet-overlay.visible { opacity: 1; }
+
+        .bottom-sheet {
+            display: none;
+            position: fixed;
+            left: 0; right: 0;
+            bottom: 0;
+            max-height: 85vh;
+            background: var(--bg-card);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+            z-index: 800;
+            flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 -8px 40px rgba(0,0,0,0.5);
+        }
+        .bottom-sheet.open { transform: translateY(0); }
+
+        .sheet-handle-area {
+            display: flex;
+            justify-content: center;
+            padding: 10px 0 6px;
+            cursor: grab;
+            flex-shrink: 0;
+        }
+        .sheet-handle {
+            width: 36px; height: 4px;
+            border-radius: 2px;
+            background: rgba(255,255,255,0.2);
+        }
+
+        .sheet-header {
+            padding: 4px 16px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-subtle);
+            flex-shrink: 0;
+        }
+        .sheet-header-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sheet-header-title i { color: var(--accent); }
+        .sheet-close {
+            width: 32px; height: 32px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-glass);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            transition: all var(--transition);
+        }
+        .sheet-close:hover { color: var(--danger); }
+
+        /* ═══════════════════════════════════════════════════
+           FLOATING MAP CONTROLS (MOBILE)
+           ═══════════════════════════════════════════════════ */
+        .map-float-controls {
+            display: none;
+            position: fixed;
+            top: calc(var(--navbar-h) + 10px);
+            left: 10px;
+            z-index: 450;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .float-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+        }
+        .float-control input,
+        .float-control select {
+            background: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-xs);
+            color: var(--text-primary);
+            padding: 5px 8px;
+            font-size: 0.75rem;
+            font-family: var(--font);
+            outline: none;
+        }
+        .float-control select {
+            -webkit-appearance: none;
+            appearance: none;
+            padding-right: 20px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 6px center;
+        }
+        .float-control label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
             white-space: nowrap;
-            user-select: none;
         }
-        .routing-badge:hover { background: rgba(33,150,243,0.25); }
-        .routing-badge.routing-busy {
-            background: rgba(255,165,0,0.15);
-            border-color: rgba(255,165,0,0.4);
-            color: #ffa726;
+
+        /* ═══════════════════════════════════════════════════
+           SETTINGS MODAL
+           ═══════════════════════════════════════════════════ */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            animation: fadeIn 0.2s ease;
         }
-        .routing-badge.routing-off {
-            opacity: 0.45;
-            background: rgba(255,255,255,0.05);
-            border-color: rgba(255,255,255,0.1);
-            color: #888;
+        .modal-overlay.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .modal-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(24px);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-xl);
+            padding: 0;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: var(--shadow-lg);
+            animation: modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+            overflow: hidden;
+        }
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .modal-header {
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .modal-header h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .modal-header h3 i { color: var(--accent); }
+
+        .modal-body { padding: 20px 24px; }
+
+        .modal-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 8px;
+        }
+        .modal-input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: var(--font);
+            outline: none;
+            transition: border-color var(--transition);
+        }
+        .modal-input:focus { border-color: var(--border-focus); }
+        .modal-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+            line-height: 1.4;
+        }
+
+        .modal-info-box {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-glass);
+            border: 1px solid var(--border-subtle);
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        .modal-info-box strong { color: var(--accent); }
+
+        .modal-footer {
+            padding: 16px 24px 20px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .btn-modal {
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-glass);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            font-family: var(--font);
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+        .btn-modal:hover {
+            background: var(--bg-glass-hover);
+            color: var(--text-primary);
+        }
+        .btn-modal.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #000;
+        }
+        .btn-modal.primary:hover { filter: brightness(1.15); }
+
+        /* ═══════════════════════════════════════════════════
+           MOBILE MENU DRAWER
+           ═══════════════════════════════════════════════════ */
+        .mobile-menu-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1500;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .mobile-menu-overlay.visible { opacity: 1; }
+
+        .mobile-menu {
+            display: none;
+            position: fixed;
+            top: 0; right: 0;
+            width: 280px;
+            max-width: 80vw;
+            height: 100%;
+            background: var(--bg-card);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-left: 1px solid var(--border-subtle);
+            z-index: 1600;
+            flex-direction: column;
+            padding: 20px;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-y: auto;
+        }
+        .mobile-menu.open { transform: translateX(0); }
+
+        .mobile-menu-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+        .mobile-menu-header h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .mobile-menu-group {
+            margin-bottom: 20px;
+        }
+        .mobile-menu-group label {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 8px;
+        }
+        .mobile-menu-group input,
+        .mobile-menu-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-family: var(--font);
+            outline: none;
+        }
+        .mobile-menu-group select {
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .mobile-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition);
+            text-decoration: none;
+            border: none;
+            background: none;
+            width: 100%;
+        }
+        .mobile-menu-item:hover { background: var(--bg-glass-hover); }
+        .mobile-menu-item i { width: 20px; text-align: center; color: var(--accent); }
+        .mobile-menu-item.danger { color: var(--danger); }
+        .mobile-menu-item.danger i { color: var(--danger); }
+
+        .mobile-menu-divider {
+            height: 1px;
+            background: var(--border-subtle);
+            margin: 12px 0;
+        }
+
+        /* ═══════════════════════════════════════════════════
+           RESPONSIVE BREAKPOINTS
+           ═══════════════════════════════════════════════════ */
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .fab-chat { display: flex; }
+            .bottom-sheet { display: flex; }
+            .map-float-controls { display: flex; }
+            .nav-desktop-controls { display: none; }
+
+            #map { right: 0; }
+
+            .nav-brand span { display: none; }
+        }
+
+        @media (min-width: 769px) {
+            #map { right: 360px; }
+            .fab-chat { display: none !important; }
+            .bottom-sheet { display: none !important; }
+            .bottom-sheet-overlay { display: none !important; }
+            .map-float-controls { display: none !important; }
+            .nav-btn.mobile-only { display: none; }
+        }
+
+        @media (max-width: 480px) {
+            .nav-brand { font-size: 0.9rem; }
+            .routing-badge { font-size: 0.65rem; padding: 4px 8px; }
         }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark">
-    <div class="container-fluid">
-        <!-- BUG FIX: fa-radar yok → fa-satellite-dish kullanıldı -->
-        <a class="navbar-brand" href="#"><i class="fa-solid fa-satellite-dish"></i> APRSRX Canlı Harita</a>
-        <div class="d-flex align-items-center gap-2">
-            <input type="date" id="historyDate" class="form-control form-control-sm bg-dark text-white border-secondary" style="width: auto;">
-            <select id="callsignFilter" class="form-select form-select-sm bg-dark text-white border-secondary" style="width: auto;" title="Araç Filtrele">
-                <option value="ALL">Tüm Araçlar</option>
-            </select>
-            <span class="text-muted">
-                <i class="fa-solid fa-circle text-success ms-2 me-1 live-dot"></i> Canlı Dinleniyor...
-            </span>
-            <span class="routing-badge" id="routingBadge" onclick="toggleRoadSnap()" title="Tıkla: Yol eşlemeyi aç/kapat">
-                <i class="fa-solid fa-road"></i> Yol Eşleme
-            </span>
-            <a href="/logout" class="btn btn-sm btn-outline-secondary ms-2" title="Çıkış Yap" style="border-color:#555;">
-                <i class="fa-solid fa-right-from-bracket"></i>
-            </a>
-        </div>
+<!-- ═══════════════════════════════════════════════════════
+     NAVBAR
+     ═══════════════════════════════════════════════════════ -->
+<nav class="app-navbar" id="appNavbar">
+    <a class="nav-brand" href="#">
+        <i class="fa-solid fa-satellite-dish"></i>
+        APRS<span>RX</span>
+    </a>
+
+    <div class="nav-live">
+        <div class="live-dot"></div>
+        Canlı
+    </div>
+
+    <div class="nav-spacer"></div>
+
+    <!-- Desktop Controls -->
+    <div class="nav-desktop-controls">
+        <input type="date" id="historyDate" class="nav-input" title="Tarih Seçin">
+        <select id="callsignFilter" class="nav-input" title="Araç Filtrele">
+            <option value="ALL">Tüm Araçlar</option>
+        </select>
+        <span class="routing-badge" id="routingBadge" onclick="toggleRoadSnap()" title="Yol Eşleme">
+            <i class="fa-solid fa-road"></i> Yol Eşleme
+        </span>
+    </div>
+
+    <div class="nav-controls">
+        <button class="nav-btn" onclick="openSettingsModal()" title="Ayarlar">
+            <i class="fa-solid fa-gear"></i>
+        </button>
+        <button class="nav-btn mobile-only" onclick="openMobileMenu()" title="Menü">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+        <a href="/logout" class="nav-btn" title="Çıkış Yap" style="text-decoration:none;">
+            <i class="fa-solid fa-right-from-bracket"></i>
+        </a>
     </div>
 </nav>
 
-<div class="container-fluid p-0">
-    <div class="row g-0">
-        <!-- Harita Alanı -->
-        <div class="col-md-8 col-lg-9">
-            <div id="map"></div>
-        </div>
-
-        <!-- Mesajlaşma Yan Paneli -->
-        <div class="col-md-4 col-lg-3" id="sidebar">
-            <div class="chat-header d-flex justify-content-between align-items-center">
-                <span><i class="fa-solid fa-comments text-info"></i> Telsiz Mesajları</span>
-                <div>
-                    <span class="badge bg-secondary me-1" id="target-badge">Genel İzleme</span>
-                    <button class="btn btn-sm btn-outline-info"
-                            data-bs-toggle="modal"
-                            data-bs-target="#settingsModal"
-                            title="Ayarlar"
-                            onclick="loadSettings()">
-                        <i class="fa-solid fa-gear"></i>
-                    </button>
-                </div>
-            </div>
-
-            <div class="chat-messages" id="chat-messages">
-                <div class="text-center text-muted mt-3 small" id="chat-placeholder">
-                    <i class="fa-solid fa-satellite-dish mb-2" style="font-size: 24px;"></i><br>
-                    APRS-IS Ağı Dinleniyor...<br>Henüz mesaj yok.
-                </div>
-            </div>
-
-            <div class="chat-input-area">
-                <!-- Canlı Hedef Göstergesi -->
-                <div class="target-bar" id="targetBar">
-                    <i class="fa-solid fa-arrow-right" style="color:#555;"></i>
-                    <span class="target-label">Hedef:</span>
-                    <span class="target-callsign" id="targetDisplay">Seçilmedi</span>
-                    <span class="target-clear" onclick="clearTarget()" title="Hedefi Temizle">
-                        <i class="fa-solid fa-xmark"></i>
-                    </span>
-                </div>
-                <form id="message-form" class="d-flex flex-column gap-2">
-                    <input type="text" id="target-input" class="form-control form-control-sm"
-                           placeholder="Hedef Çağrı İşareti (Orn: TA7KES-1)"
-                           oninput="updateTargetBar(this.value)">
-                    <div class="input-group">
-                        <input type="text" id="message-input" class="form-control"
-                               placeholder="Mesajınızı yazın..." required>
-                        <button class="btn btn-info" type="submit" id="sendBtn">
-                            <i class="fa-solid fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Ayarlar Modal -->
-<div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content bg-dark text-light border-secondary">
-      <div class="modal-header border-secondary">
-        <h5 class="modal-title"><i class="fa-solid fa-satellite-dish"></i> APRS Takip Ayarları</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-3">
-          <label for="trackedCallsigns" class="form-label">Takip Edilecek Çağrı İşaretleri</label>
-          <input type="text" class="form-control bg-secondary text-light border-dark"
-                 id="trackedCallsigns" placeholder="TA7KES, TA7BSS, YM7KSE">
-          <div class="form-text text-light opacity-75">
-            Çağrı işaretlerini virgülle ayırarak giriniz. Sistem bu istasyonlardan gelen konum ve mesajları dinleyecektir.
-          </div>
-        </div>
-        <!-- Mevcut config bilgisi -->
-        <div class="alert alert-secondary p-2 small mb-0">
-          <i class="fa-solid fa-circle-info me-1"></i>
-          Bağlı callsign: <strong>{{ config.get('aprs', {}).get('callsign', 'NOCALL') }}</strong><br>
-          Sunucu: <strong>{{ config.get('aprs', {}).get('server', '-') }}:{{ config.get('aprs', {}).get('port', '-') }}</strong>
-        </div>
-      </div>
-      <div class="modal-footer border-secondary">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-        <button type="button" class="btn btn-info" onclick="saveSettings()">
-            <i class="fa-solid fa-floppy-disk me-1"></i>Kaydet ve Yeniden Başlat
+<!-- ═══════════════════════════════════════════════════════
+     MOBILE MENU DRAWER
+     ═══════════════════════════════════════════════════════ -->
+<div class="mobile-menu-overlay" id="mobileMenuOverlay" onclick="closeMobileMenu()"></div>
+<div class="mobile-menu" id="mobileMenu">
+    <div class="mobile-menu-header">
+        <h3><i class="fa-solid fa-satellite-dish"></i> APRSRX</h3>
+        <button class="sheet-close" onclick="closeMobileMenu()">
+            <i class="fa-solid fa-xmark"></i>
         </button>
-      </div>
     </div>
-  </div>
+
+    <div class="mobile-menu-group">
+        <label><i class="fa-solid fa-calendar-day"></i> Tarih</label>
+        <input type="date" id="historyDateMobile" class="nav-input">
+    </div>
+
+    <div class="mobile-menu-group">
+        <label><i class="fa-solid fa-filter"></i> Araç Filtresi</label>
+        <select id="callsignFilterMobile">
+            <option value="ALL">Tüm Araçlar</option>
+        </select>
+    </div>
+
+    <div class="mobile-menu-group">
+        <label><i class="fa-solid fa-road"></i> Yol Eşleme</label>
+        <div class="routing-badge" id="routingBadgeMobile" onclick="toggleRoadSnap()" style="width:fit-content;">
+            <i class="fa-solid fa-road"></i> Yol Eşleme
+        </div>
+    </div>
+
+    <div class="mobile-menu-divider"></div>
+
+    <button class="mobile-menu-item" onclick="openSettingsModal(); closeMobileMenu();">
+        <i class="fa-solid fa-gear"></i> Takip Ayarları
+    </button>
+    <a href="/tracker" class="mobile-menu-item">
+        <i class="fa-solid fa-location-dot"></i> Mobil Tracker
+    </a>
+
+    <div class="mobile-menu-divider"></div>
+
+    <a href="/logout" class="mobile-menu-item danger">
+        <i class="fa-solid fa-right-from-bracket"></i> Çıkış Yap
+    </a>
 </div>
 
-<!-- Bootstrap Bundle JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<!-- Socket.IO -->
+<!-- ═══════════════════════════════════════════════════════
+     MAP
+     ═══════════════════════════════════════════════════════ -->
+<div id="map"></div>
+
+<!-- Mobile Floating Controls (date & filter for quick access) -->
+<div class="map-float-controls" id="mapFloatControls">
+    <div class="float-control">
+        <label><i class="fa-solid fa-calendar-day"></i></label>
+        <input type="date" id="historyDateFloat">
+    </div>
+    <div class="float-control">
+        <label><i class="fa-solid fa-filter"></i></label>
+        <select id="callsignFilterFloat">
+            <option value="ALL">Tümü</option>
+        </select>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SIDEBAR (DESKTOP)
+     ═══════════════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="sidebar-header-title">
+            <i class="fa-solid fa-comments"></i>
+            Telsiz Mesajları
+        </div>
+        <div class="sidebar-header-actions">
+            <span class="badge-target" id="target-badge">Genel İzleme</span>
+        </div>
+    </div>
+
+    <div class="chat-messages" id="chat-messages">
+        <div class="chat-placeholder" id="chat-placeholder">
+            <i class="fa-solid fa-satellite-dish"></i>
+            <div>APRS-IS Ağı Dinleniyor...<br>Henüz mesaj yok.</div>
+        </div>
+    </div>
+
+    <div class="chat-input-area">
+        <div class="target-bar" id="targetBar">
+            <i class="fa-solid fa-arrow-right" style="color:var(--text-muted); font-size:0.75rem;"></i>
+            <span class="target-label">Hedef:</span>
+            <span class="target-callsign" id="targetDisplay">Seçilmedi</span>
+            <span class="target-clear" onclick="clearTarget()" title="Hedefi Temizle">
+                <i class="fa-solid fa-xmark"></i>
+            </span>
+        </div>
+        <form id="message-form" class="chat-form">
+            <input type="text" id="target-input" class="chat-input"
+                   placeholder="Hedef Çağrı İşareti (Orn: TA7KES-1)"
+                   oninput="updateTargetBar(this.value)">
+            <div class="chat-send-row">
+                <input type="text" id="message-input" class="chat-input"
+                       placeholder="Mesajınızı yazın..." required>
+                <button class="btn-send" type="submit" id="sendBtn" title="Gönder">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</aside>
+
+<!-- ═══════════════════════════════════════════════════════
+     FAB (MOBILE)
+     ═══════════════════════════════════════════════════════ -->
+<button class="fab-chat" id="fabChat" onclick="openBottomSheet()">
+    <i class="fa-solid fa-comments"></i>
+    <span class="fab-badge" id="fabBadge">0</span>
+</button>
+
+<!-- ═══════════════════════════════════════════════════════
+     BOTTOM SHEET (MOBILE CHAT)
+     ═══════════════════════════════════════════════════════ -->
+<div class="bottom-sheet-overlay" id="sheetOverlay" onclick="closeBottomSheet()"></div>
+<div class="bottom-sheet" id="bottomSheet">
+    <div class="sheet-handle-area" id="sheetHandle">
+        <div class="sheet-handle"></div>
+    </div>
+    <div class="sheet-header">
+        <div class="sheet-header-title">
+            <i class="fa-solid fa-comments"></i>
+            Telsiz Mesajları
+        </div>
+        <button class="sheet-close" onclick="closeBottomSheet()">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    <div class="chat-messages" id="chat-messages-mobile">
+        <!-- Mirrored from desktop -->
+    </div>
+    <div class="chat-input-area">
+        <div class="target-bar" id="targetBarMobile">
+            <i class="fa-solid fa-arrow-right" style="color:var(--text-muted); font-size:0.75rem;"></i>
+            <span class="target-label">Hedef:</span>
+            <span class="target-callsign" id="targetDisplayMobile">Seçilmedi</span>
+            <span class="target-clear" onclick="clearTarget()" title="Hedefi Temizle">
+                <i class="fa-solid fa-xmark"></i>
+            </span>
+        </div>
+        <form id="message-form-mobile" class="chat-form">
+            <input type="text" id="target-input-mobile" class="chat-input"
+                   placeholder="Hedef Çağrı İşareti"
+                   oninput="updateTargetBar(this.value)">
+            <div class="chat-send-row">
+                <input type="text" id="message-input-mobile" class="chat-input"
+                       placeholder="Mesajınızı yazın..." required>
+                <button class="btn-send" type="submit" title="Gönder">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SETTINGS MODAL
+     ═══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="settingsModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-satellite-dish"></i> APRS Takip Ayarları</h3>
+            <button class="sheet-close" onclick="closeSettingsModal()">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <label for="trackedCallsigns" class="modal-label">Takip Edilecek Çağrı İşaretleri</label>
+            <input type="text" class="modal-input" id="trackedCallsigns"
+                   placeholder="TA7KES, TA7BSS, YM7KSE">
+            <div class="modal-hint">
+                Çağrı işaretlerini virgülle ayırarak giriniz. Sistem bu istasyonlardan gelen konum ve mesajları dinleyecektir.
+            </div>
+            <div class="modal-info-box">
+                <i class="fa-solid fa-circle-info" style="color:var(--accent);"></i>
+                Bağlı callsign: <strong>{{ config.get('aprs', {}).get('callsign', 'NOCALL') }}</strong><br>
+                Sunucu: <strong>{{ config.get('aprs', {}).get('server', '-') }}:{{ config.get('aprs', {}).get('port', '-') }}</strong>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-modal" onclick="closeSettingsModal()">İptal</button>
+            <button class="btn-modal primary" onclick="saveSettings()">
+                <i class="fa-solid fa-floppy-disk"></i> Kaydet
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCRIPTS
+     ═══════════════════════════════════════════════════════ -->
 <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- APRS Symbols JS -->
 <script src="https://cdn.jsdelivr.net/gh/OK-DMR/aprs-symbols@master/aprs-symbols.js"></script>
-<!-- Leaflet PolylineDecorator (ok işaretleri) -->
 <script src="https://cdn.jsdelivr.net/npm/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.min.js"></script>
 
 <script>
-    // ─── Jinja2 ───────────────────────────────────────────────────────────────
+    // ─── Jinja2 Config ────────────────────────────────────────────────────────
     const MY_CALLSIGN  = "{{ config.get('aprs', {}).get('callsign', 'NOCALL') }}";
     const TRACKED_CALLS = [
         {% for t in config.get('tracked_callsigns', []) %}
@@ -397,7 +1238,108 @@
         });
     }
 
-    // ─── Harita Başlatma ───────────────────────────────────────────────────────
+    // ─── Mobile UI ────────────────────────────────────────────────────────────
+    let mobileUnread = 0;
+
+    function openMobileMenu() {
+        const overlay = document.getElementById('mobileMenuOverlay');
+        const menu = document.getElementById('mobileMenu');
+        overlay.style.display = 'block';
+        menu.style.display = 'flex';
+        requestAnimationFrame(() => {
+            overlay.classList.add('visible');
+            menu.classList.add('open');
+        });
+    }
+    function closeMobileMenu() {
+        const overlay = document.getElementById('mobileMenuOverlay');
+        const menu = document.getElementById('mobileMenu');
+        overlay.classList.remove('visible');
+        menu.classList.remove('open');
+        setTimeout(() => { overlay.style.display = 'none'; menu.style.display = 'none'; }, 300);
+    }
+
+    function openBottomSheet() {
+        const overlay = document.getElementById('sheetOverlay');
+        const sheet = document.getElementById('bottomSheet');
+        overlay.style.display = 'block';
+        requestAnimationFrame(() => {
+            overlay.classList.add('visible');
+            sheet.classList.add('open');
+        });
+        // Reset unread
+        mobileUnread = 0;
+        const fabBadge = document.getElementById('fabBadge');
+        fabBadge.style.display = 'none';
+        // Sync messages
+        syncMobileChat();
+    }
+    function closeBottomSheet() {
+        const overlay = document.getElementById('sheetOverlay');
+        const sheet = document.getElementById('bottomSheet');
+        overlay.classList.remove('visible');
+        sheet.classList.remove('open');
+        setTimeout(() => { overlay.style.display = 'none'; }, 350);
+    }
+
+    function syncMobileChat() {
+        const desktop = document.getElementById('chat-messages');
+        const mobile = document.getElementById('chat-messages-mobile');
+        mobile.innerHTML = desktop.innerHTML;
+        mobile.scrollTop = mobile.scrollHeight;
+    }
+
+    function incrementMobileUnread() {
+        if (window.innerWidth > 768) return;
+        const sheet = document.getElementById('bottomSheet');
+        if (sheet.classList.contains('open')) {
+            syncMobileChat();
+            return;
+        }
+        mobileUnread++;
+        const fabBadge = document.getElementById('fabBadge');
+        fabBadge.textContent = mobileUnread > 9 ? '9+' : mobileUnread;
+        fabBadge.style.display = 'flex';
+    }
+
+    // Settings modal
+    function openSettingsModal() {
+        document.getElementById('settingsModal').classList.add('active');
+        loadSettings();
+    }
+    function closeSettingsModal() {
+        document.getElementById('settingsModal').classList.remove('active');
+    }
+
+    // ─── Sync date/filter controls across desktop, mobile menu, and float ───
+    function syncDateControls(value) {
+        document.getElementById('historyDate').value = value;
+        document.getElementById('historyDateMobile').value = value;
+        document.getElementById('historyDateFloat').value = value;
+    }
+    function syncFilterControls(value) {
+        document.getElementById('callsignFilter').value = value;
+        document.getElementById('callsignFilterMobile').value = value;
+        document.getElementById('callsignFilterFloat').value = value;
+    }
+
+    // Date listeners
+    ['historyDate', 'historyDateMobile', 'historyDateFloat'].forEach(id => {
+        document.getElementById(id).addEventListener('change', e => {
+            syncDateControls(e.target.value);
+            loadHistory(e.target.value);
+        });
+    });
+    // Filter listeners
+    ['callsignFilter', 'callsignFilterMobile', 'callsignFilterFloat'].forEach(id => {
+        document.getElementById(id).addEventListener('change', e => {
+            activeFilter = e.target.value;
+            syncFilterControls(e.target.value);
+            applyFilter();
+        });
+    });
+
+    // ─── Map Init ─────────────────────────────────────────────────────────────
     const map = L.map('map', { zoomControl: false }).setView([40.8, 37.3], 9);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -408,20 +1350,15 @@
     googleHybrid.addTo(map);
     L.control.layers({ "Google Uydu (Karma)": googleHybrid, "Google Harita": googleStreet, "OpenStreetMap": osm }, null, { position: 'topright' }).addTo(map);
 
-    // ─── Durum Değişkenleri ────────────────────────────────────────────────────
-    const markers     = {};   // callsign → L.Marker
-    const trackGroups = {};   // callsign → L.LayerGroup
-    const rawPoints   = {};   // callsign → [[lat,lon], ...]
-    const routeCache  = {};   // "lat,lon|lat,lon" → [[lat,lon], ...]
+    // ─── State ────────────────────────────────────────────────────────────────
+    const markers     = {};
+    const trackGroups = {};
+    const rawPoints   = {};
+    const routeCache  = {};
     let   roadSnap    = true;
     let   activeFilter = 'ALL';
 
-    // ─── Filtreleme Mantığı ───────────────────────────────────────────────────
-    document.getElementById('callsignFilter').addEventListener('change', (e) => {
-        activeFilter = e.target.value;
-        applyFilter();
-    });
-
+    // ─── Filter Logic ─────────────────────────────────────────────────────────
     function applyFilter() {
         Object.keys(markers).forEach(callsign => {
             const show = (activeFilter === 'ALL' || activeFilter === callsign);
@@ -436,30 +1373,23 @@
     }
 
     function ensureCallsignOption(callsign) {
-        const filterSelect = document.getElementById('callsignFilter');
-        if (!Array.from(filterSelect.options).some(o => o.value === callsign)) {
-            const opt = document.createElement('option');
-            opt.value = callsign;
-            opt.textContent = callsign;
-            filterSelect.appendChild(opt);
-        }
+        ['callsignFilter', 'callsignFilterMobile', 'callsignFilterFloat'].forEach(id => {
+            const sel = document.getElementById(id);
+            if (!Array.from(sel.options).some(o => o.value === callsign)) {
+                const opt = document.createElement('option');
+                opt.value = callsign;
+                opt.textContent = callsign;
+                sel.appendChild(opt);
+            }
+        });
     }
 
-    const MAX_GAP_KM = 80;   // Bu kadar atlarsa yeni segment
-    const CHUNK_SIZE = 8;    // OSRM başına max waypoint
+    const MAX_GAP_KM = 80;
+    const CHUNK_SIZE = 8;
 
-    // Her callsign'a farklı renk ata
     const COLOR_PALETTE = [
-        '#2979ff', // mavi
-        '#00c853', // yeşil
-        '#ff6d00', // turuncu
-        '#aa00ff', // mor
-        '#00b0ff', // açık mavi
-        '#c51162', // pembe-kırmızı
-        '#64dd17', // lime
-        '#ffab00', // amber
-        '#00bfa5', // teal
-        '#d50000', // kırmızı
+        '#2979ff', '#00c853', '#ff6d00', '#aa00ff', '#00b0ff',
+        '#c51162', '#64dd17', '#ffab00', '#00bfa5', '#d50000',
     ];
     const callsignColorMap = {};
     let   colorIdx         = 0;
@@ -476,7 +1406,7 @@
     const chatContainer   = document.getElementById('chat-messages');
     const chatPlaceholder = document.getElementById('chat-placeholder');
 
-    // ─── Yardımcı Fonksiyonlar ─────────────────────────────────────────────────
+    // ─── Helpers ──────────────────────────────────────────────────────────────
     function haversineKm(lat1, lon1, lat2, lon2) {
         const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
         const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
@@ -489,7 +1419,6 @@
         return r;
     }
 
-    // Çok fazla nokta varsa aralıklı örnekle (max maxN nokta)
     function downsample(pts, maxN) {
         if (pts.length <= maxN) return pts;
         const result = [pts[0]];
@@ -499,30 +1428,30 @@
         return result;
     }
 
-    // ─── Routing Status Badge ─────────────────────────────────────────────────
+    // ─── Routing Badge ────────────────────────────────────────────────────────
     function setRoutingBadge(state) {
-        // state: 'idle' | 'busy' | 'off'
-        const badge = document.getElementById('routingBadge');
-        if (!badge) return;
-        badge.className = 'routing-badge' + (state === 'busy' ? ' routing-busy' : state === 'off' ? ' routing-off' : '');
-        badge.innerHTML = state === 'busy'
-            ? '<i class="fa-solid fa-circle-notch fa-spin"></i> Yol Hesaplanıyor...'
-            : state === 'off'
-                ? '<i class="fa-solid fa-road"></i> Yol Eşleme Kapalı'
-                : '<i class="fa-solid fa-road"></i> Yol Eşleme';
+        ['routingBadge', 'routingBadgeMobile'].forEach(id => {
+            const badge = document.getElementById(id);
+            if (!badge) return;
+            badge.className = 'routing-badge' + (state === 'busy' ? ' routing-busy' : state === 'off' ? ' routing-off' : '');
+            badge.innerHTML = state === 'busy'
+                ? '<i class="fa-solid fa-circle-notch fa-spin"></i> Hesaplanıyor...'
+                : state === 'off'
+                    ? '<i class="fa-solid fa-road"></i> Yol Eşleme Kapalı'
+                    : '<i class="fa-solid fa-road"></i> Yol Eşleme';
+        });
     }
 
     function toggleRoadSnap() {
         roadSnap = !roadSnap;
         setRoutingBadge(roadSnap ? 'idle' : 'off');
-        // Tüm track'leri yeniden çiz
         const calls = Object.keys(rawPoints);
         (async () => {
             for (const cs of calls) await redrawTrack(cs);
         })();
     }
 
-    // ─── OSRM Yol Eşleme ─────────────────────────────────────────────────────
+    // ─── OSRM Routing ────────────────────────────────────────────────────────
     async function fetchOSRMRoute(points) {
         if (!roadSnap || points.length < 2) return points;
 
@@ -545,15 +1474,13 @@
                 routeCache[key] = result;
                 return result;
             }
-        } catch (e) { /* timeout veya hata → düz çizgi */ }
+        } catch (e) { /* timeout or error → straight line */ }
         return points;
     }
 
-    // Tüm noktaları segmentlere böl ve her segmenti OSRM ile route et
     async function routeAllPoints(points) {
         if (points.length < 2) return [points];
 
-        // Büyük atlamalar = yeni segment
         const segments = [];
         let cur = [points[0]];
         for (let i = 1; i < points.length; i++) {
@@ -578,8 +1505,7 @@
         return result;
     }
 
-    // ─── Track Çizimi ─────────────────────────────────────────────────────────
-
+    // ─── Track Drawing ────────────────────────────────────────────────────────
     function renderSegment(group, pts, color) {
         if (pts.length < 2) return;
         const line = L.polyline(pts, {
@@ -587,7 +1513,6 @@
             lineJoin: 'round', lineCap: 'round'
         }).addTo(group);
 
-        // Ok işaretleri
         if (typeof L.polylineDecorator !== 'undefined' && pts.length >= 4) {
             L.polylineDecorator(line, {
                 patterns: [{
@@ -612,18 +1537,17 @@
         const segs  = await routeAllPoints(pts);
         segs.forEach(seg => renderSegment(group, seg, color));
         trackGroups[callsign] = group;
-        
+
         const show = (activeFilter === 'ALL' || activeFilter === callsign);
         if (show) group.addTo(map);
 
         setRoutingBadge(roadSnap ? 'idle' : 'off');
     }
 
-    // Canlı paketten yeni segment ekle (yalnızca son iki noktayı route et)
     async function addLiveSegment(callsign, newLatLng) {
         const pts = rawPoints[callsign];
         const show = (activeFilter === 'ALL' || activeFilter === callsign);
-        
+
         if (!pts || pts.length === 0) {
             if (!trackGroups[callsign]) {
                 trackGroups[callsign] = L.layerGroup();
@@ -633,7 +1557,7 @@
         }
         const prev = pts[pts.length - 1];
         const dist = haversineKm(prev[0], prev[1], newLatLng[0], newLatLng[1]);
-        if (dist > MAX_GAP_KM) return; // büyük atlama → segment ekleme
+        if (dist > MAX_GAP_KM) return;
 
         if (!trackGroups[callsign]) {
             trackGroups[callsign] = L.layerGroup();
@@ -644,7 +1568,7 @@
         renderSegment(trackGroups[callsign], seg, color);
     }
 
-    // ─── Marker ───────────────────────────────────────────────────────────────
+    // ─── Markers ──────────────────────────────────────────────────────────────
     function getAprsIcon(symbolTable, symbol) {
         if (!symbolTable || !symbol) return '<i class="fa-solid fa-broadcast-tower"></i>';
         const fullSymbol = symbolTable + symbol;
@@ -680,7 +1604,7 @@
         } else {
             markers[callsign].setLatLng(latlng).setIcon(divIcon).bindPopup(popupText);
         }
-        
+
         const show = (activeFilter === 'ALL' || activeFilter === callsign);
         if (show && !map.hasLayer(markers[callsign])) {
             markers[callsign].addTo(map);
@@ -689,42 +1613,61 @@
         }
     }
 
-    // ─── Mesaj Kutusu ─────────────────────────────────────────────────────────
+    // ─── Messages ─────────────────────────────────────────────────────────────
     window.onerror = function(msg, url, lineNo, columnNo, error) {
         if (!chatContainer) return false;
         const errDiv = document.createElement('div');
-        errDiv.style.color = 'red';
-        errDiv.style.padding = '10px';
+        errDiv.style.cssText = 'color:#ff5252;padding:10px;font-size:0.8rem;';
         errDiv.innerHTML = `<strong>JS Error:</strong> ${msg} <br> Line: ${lineNo}`;
         chatContainer.appendChild(errDiv);
         return false;
     };
-    
+
     function updateTargetBar(val) {
-        const bar     = document.getElementById('targetBar');
-        const display = document.getElementById('targetDisplay');
-        const badge   = document.getElementById('target-badge');
-        if (val && val.trim()) {
-            bar.className     = 'target-bar has-target';
-            display.textContent = val.trim().toUpperCase();
-            if (badge) badge.innerText = val.trim().toUpperCase();
-        } else {
-            bar.className     = 'target-bar';
-            display.textContent = 'Seçilmedi';
-            if (badge) badge.innerText = 'Genel İzleme';
-        }
+        const displays = ['targetDisplay', 'targetDisplayMobile'];
+        const bars     = ['targetBar', 'targetBarMobile'];
+        const badge    = document.getElementById('target-badge');
+
+        displays.forEach((id, i) => {
+            const display = document.getElementById(id);
+            const bar     = document.getElementById(bars[i]);
+            if (val && val.trim()) {
+                bar.className     = 'target-bar has-target';
+                display.textContent = val.trim().toUpperCase();
+            } else {
+                bar.className     = 'target-bar';
+                display.textContent = 'Seçilmedi';
+            }
+        });
+        if (badge) badge.innerText = (val && val.trim()) ? val.trim().toUpperCase() : 'Genel İzleme';
+        if (badge) badge.className = (val && val.trim()) ? 'badge-target active' : 'badge-target';
+
+        // Sync target inputs
+        ['target-input', 'target-input-mobile'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el !== document.activeElement) el.value = val || '';
+        });
     }
 
     function clearTarget() {
-        document.getElementById('target-input').value = '';
+        ['target-input', 'target-input-mobile'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
         updateTargetBar('');
-        document.getElementById('message-input').focus();
     }
 
     function setTarget(callsign) {
-        document.getElementById('target-input').value = callsign;
+        ['target-input', 'target-input-mobile'].forEach(id => {
+            document.getElementById(id).value = callsign;
+        });
         updateTargetBar(callsign);
-        document.getElementById('message-input').focus();
+        // Focus the appropriate input
+        if (window.innerWidth <= 768) {
+            openBottomSheet();
+            setTimeout(() => document.getElementById('message-input-mobile').focus(), 400);
+        } else {
+            document.getElementById('message-input').focus();
+        }
     }
 
     function appendMessage(sender, receiver, text, isSelf, customTime = null) {
@@ -735,40 +1678,41 @@
 
         const headerRight = isSelf && receiver
             ? `<span style="display:flex;align-items:center;gap:6px;">
-                   <span style="font-size:0.75rem;opacity:0.8;">→</span>
-                   <strong style="color:#fff;font-size:0.82rem;letter-spacing:0.3px;">${receiver}</strong>
-                   <span style="opacity:0.6;">${time}</span>
+                   <span style="font-size:0.7rem;opacity:0.6;">→</span>
+                   <strong style="color:var(--accent);font-size:0.78rem;">${receiver}</strong>
+                   <span style="opacity:0.5;">${time}</span>
                </span>`
             : `<span>${time}</span>`;
 
         msgDiv.innerHTML = `
             <div class="message-header">
-                <strong class="${!isSelf ? 'btn-chat-target' : ''}"
+                <strong class="message-sender"
                         onclick="${!isSelf ? `setTarget('${sender}')` : ''}">${isSelf ? 'Ben' : sender}</strong>
                 ${headerRight}
             </div>
             <div>${text}</div>
             ${!isSelf && receiver
-                ? `<div style="font-size:0.7rem;color:#aaa;text-align:right;margin-top:4px;">&#8594; ${receiver}</div>`
+                ? `<div style="font-size:0.68rem;color:var(--text-muted);text-align:right;margin-top:4px;">&#8594; ${receiver}</div>`
                 : ''}`;
         chatContainer.appendChild(msgDiv);
         chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        // Notify mobile
+        incrementMobileUnread();
     }
 
-    // ─── Geçmiş Yükle ─────────────────────────────────────────────────────────
-    document.getElementById('historyDate').addEventListener('change', e => loadHistory(e.target.value));
-
+    // ─── History ──────────────────────────────────────────────────────────────
     async function loadHistory(dateStr) {
         let url = '/api/history?t=' + Date.now();
         if (dateStr) url += '&date=' + dateStr;
 
-        // Haritayı temizle
+        // Clear map
         Object.values(markers).forEach(m => map.removeLayer(m));
         Object.keys(markers).forEach(k => delete markers[k]);
         Object.values(trackGroups).forEach(g => { if (g) map.removeLayer(g); });
         Object.keys(trackGroups).forEach(k => delete trackGroups[k]);
         Object.keys(rawPoints).forEach(k => delete rawPoints[k]);
-        Object.keys(routeCache).forEach(k => delete routeCache[k]); // cache temizle
+        Object.keys(routeCache).forEach(k => delete routeCache[k]);
         chatContainer.innerHTML = '';
 
         try {
@@ -776,13 +1720,15 @@
             const data = await r.json();
             if (data.status !== 'success') return;
 
-        const filterSelect = document.getElementById('callsignFilter');
-        filterSelect.innerHTML = '<option value="ALL">Tüm Araçlar</option>';
-        activeFilter = 'ALL';
+            // Reset filter dropdowns
+            ['callsignFilter', 'callsignFilterMobile', 'callsignFilterFloat'].forEach(id => {
+                const sel = document.getElementById(id);
+                sel.innerHTML = '<option value="ALL">Tüm Araçlar</option>';
+            });
+            activeFilter = 'ALL';
 
-        // Callsign'a göre grupla
-        const byCallsign = {};
-        data.locations.forEach(loc => {
+            const byCallsign = {};
+            data.locations.forEach(loc => {
                 if (!byCallsign[loc.callsign]) byCallsign[loc.callsign] = [];
                 byCallsign[loc.callsign].push(loc);
             });
@@ -796,10 +1742,10 @@
                 const lastSeen = new Date(last.timestamp * 1000).toLocaleString('tr-TR');
 
                 const popupText = `
-                    <strong>${callsign}</strong><br>
-                    ${last.comment ? `<small class="text-muted">${last.comment}</small><br>` : ''}
-                    <small class="text-muted">Son Görülme: ${lastSeen}</small><br>
-                    <button class="btn btn-sm btn-info mt-2 w-100" onclick="setTarget('${callsign}')">
+                    <div class="popup-callsign">${callsign}</div>
+                    ${last.comment ? `<div class="popup-comment">${last.comment}</div>` : ''}
+                    <div class="popup-time">Son Görülme: ${lastSeen}</div>
+                    <button class="popup-btn" onclick="setTarget('${callsign}')">
                         <i class="fa-solid fa-comment"></i> Mesaj Yaz
                     </button>`;
 
@@ -807,7 +1753,7 @@
                 await redrawTrack(callsign);
             }
 
-            // Mesajlar
+            // Messages
             data.messages.forEach(msg => {
                 const t      = new Date(msg.timestamp * 1000).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
                 const isSelf = msg.sender.toUpperCase().startsWith(MY_CALLSIGN.split('-')[0].toUpperCase());
@@ -816,24 +1762,22 @@
         } catch (err) {
             console.error('loadHistory error:', err);
             const errDiv = document.createElement('div');
-            errDiv.style.color = '#ff5252';
-            errDiv.style.padding = '10px';
-            errDiv.style.fontSize = '0.85rem';
+            errDiv.style.cssText = 'color:#ff5252;padding:10px;font-size:0.82rem;';
             errDiv.innerHTML = `<strong>Geçmiş yükleme hatası:</strong> ${err.message || err}`;
             chatContainer.appendChild(errDiv);
         }
     }
 
-    // Sayfa Yüklenince
+    // Init date
     window.addEventListener('DOMContentLoaded', () => {
         const today = new Date();
         const offset = today.getTimezoneOffset() * 60000;
         const localISOTime = (new Date(today - offset)).toISOString().split('T')[0];
-        document.getElementById('historyDate').value = localISOTime;
-        loadHistory(document.getElementById('historyDate').value);
+        syncDateControls(localISOTime);
+        loadHistory(localISOTime);
     });
 
-    // ─── Canlı APRS Paket ─────────────────────────────────────────────────────
+    // ─── Live APRS Packets ────────────────────────────────────────────────────
     socket.on('connect', () => console.log('Sunucuya bağlanıldı!'));
 
     socket.on('aprs_packet', async (packet) => {
@@ -843,9 +1787,9 @@
         if (packet.latitude && packet.longitude) {
             const latlng    = [packet.latitude, packet.longitude];
             const popupText = `
-                <strong>${callsign}</strong><br>
-                ${packet.comment ? `<small class="text-muted">${packet.comment}</small><br>` : ''}
-                <button class="btn btn-sm btn-info mt-2 w-100" onclick="setTarget('${callsign}')">
+                <div class="popup-callsign">${callsign}</div>
+                ${packet.comment ? `<div class="popup-comment">${packet.comment}</div>` : ''}
+                <button class="popup-btn" onclick="setTarget('${callsign}')">
                     <i class="fa-solid fa-comment"></i> Mesaj Yaz
                 </button>`;
 
@@ -867,11 +1811,10 @@
         }
     });
 
-    // ─── Mesaj Gönderme ───────────────────────────────────────────────────────
-    document.getElementById('message-form').addEventListener('submit', e => {
-        e.preventDefault();
-        const target   = document.getElementById('target-input').value.trim();
-        const msgInput = document.getElementById('message-input');
+    // ─── Send Message ─────────────────────────────────────────────────────────
+    function handleSendMessage(targetId, msgId) {
+        const target   = document.getElementById(targetId).value.trim();
+        const msgInput = document.getElementById(msgId);
         const text     = msgInput.value.trim();
         if (!target) { alert('Lütfen hedefin çağrı işaretini girin!'); return; }
         if (!text) return;
@@ -880,9 +1823,19 @@
             if (resp?.status === 'error') alert('Mesaj Gönderilemedi: ' + resp.message);
         });
         msgInput.value = '';
+    }
+
+    document.getElementById('message-form').addEventListener('submit', e => {
+        e.preventDefault();
+        handleSendMessage('target-input', 'message-input');
     });
 
-    // ─── Ayarlar ──────────────────────────────────────────────────────────────
+    document.getElementById('message-form-mobile').addEventListener('submit', e => {
+        e.preventDefault();
+        handleSendMessage('target-input-mobile', 'message-input-mobile');
+    });
+
+    // ─── Settings ─────────────────────────────────────────────────────────────
     function loadSettings() {
         fetch('/api/settings').then(r => r.json()).then(data => {
             if (data.status === 'success')
@@ -900,8 +1853,7 @@
         }).then(r => r.json()).then(data => {
             if (data.status === 'success') {
                 alert(data.message);
-                const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
-                if (modal) modal.hide();
+                closeSettingsModal();
                 setTimeout(() => window.location.reload(), 1500);
             } else {
                 alert('Hata: ' + data.message);

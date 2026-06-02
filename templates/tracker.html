@@ -2,260 +2,639 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>APRSRX - Mobil Tracker</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0a12">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="APRSRX Mobil Tracker — Cihaz konumunuzu gerçek zamanlı gönderin">
+    <title>APRSRX — Mobil Tracker</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%2300d4ff' d='M432 208H80c-26.5 0-48 21.5-48 48v160c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V256c0-26.5-21.5-48-48-48zm-176 96c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64z'/%3E%3C/svg%3E">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
     <style>
         :root {
-            --bg: #121212;
-            --card: #1e1e1e;
-            --border: #333;
-            --accent: #0dcaf0;
-            --success: #198754;
-            --danger: #dc3545;
+            --bg-primary: #0a0a12;
+            --bg-card: rgba(16, 18, 30, 0.92);
+            --bg-glass: rgba(255, 255, 255, 0.04);
+            --bg-glass-hover: rgba(255, 255, 255, 0.08);
+            --bg-input: rgba(255, 255, 255, 0.06);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-focus: rgba(0, 212, 255, 0.5);
+            --accent: #00d4ff;
+            --accent-dim: rgba(0, 212, 255, 0.15);
+            --accent-glow: rgba(0, 212, 255, 0.3);
+            --accent-secondary: #7b61ff;
+            --success: #00e676;
+            --success-dim: rgba(0, 230, 118, 0.12);
+            --warning: #ffab00;
+            --danger: #ff5252;
+            --danger-dim: rgba(255, 82, 82, 0.12);
+            --text-primary: #f0f0f5;
+            --text-secondary: rgba(255, 255, 255, 0.5);
+            --text-muted: rgba(255, 255, 255, 0.3);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+            --radius-full: 9999px;
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+            --shadow-md: 0 8px 32px rgba(0,0,0,0.4);
+            --shadow-lg: 0 16px 48px rgba(0,0,0,0.5);
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
-        * { box-sizing: border-box; }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            background: var(--bg);
-            color: #e0e0e0;
-            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            padding: 20px;
+            -webkit-tap-highlight-color: transparent;
         }
-        .card-panel {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 24px;
-            width: 100%;
-            max-width: 420px;
-            margin-bottom: 16px;
+
+        /* ─── Background Effects ─── */
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0, 212, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
         }
-        h1 { color: var(--accent); font-size: 1.4rem; font-weight: 700; }
-        .status-dot {
-            display: inline-block;
-            width: 10px; height: 10px;
+        .bg-glow {
+            position: fixed;
+            width: 400px; height: 400px;
             border-radius: 50%;
-            background: var(--danger);
-            margin-right: 6px;
-            transition: background 0.3s;
+            filter: blur(120px);
+            opacity: 0.08;
+            pointer-events: none;
+            z-index: 0;
         }
-        .status-dot.active { background: var(--success); animation: pulse 1.5s infinite; }
-        @keyframes pulse {
-            0%,100% { opacity: 1; }
-            50%      { opacity: 0.4; }
-        }
-        .info-row {
+        .bg-glow-1 { background: var(--accent); top: -100px; left: -100px; }
+        .bg-glow-2 { background: var(--accent-secondary); bottom: -100px; right: -100px; }
+
+        /* ─── Header ─── */
+        .page-header {
+            position: relative;
+            z-index: 1;
+            padding: 20px 16px 12px;
             display: flex;
+            align-items: center;
             justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header-back {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px; height: 38px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-glass);
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all var(--transition);
             font-size: 0.9rem;
         }
-        .info-row:last-child { border-bottom: none; }
-        .info-label { color: #888; }
-        .info-value { font-weight: 600; color: #fff; }
-        .btn-tracker {
+        .header-back:hover { color: var(--accent); background: var(--bg-glass-hover); }
+        .header-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-subtitle {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* ─── Main Content ─── */
+        .tracker-content {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            padding: 0 16px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-width: 500px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* ─── Cards ─── */
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            animation: cardIn 0.4s ease-out both;
+        }
+        .card:nth-child(2) { animation-delay: 0.05s; }
+        .card:nth-child(3) { animation-delay: 0.1s; }
+        .card:nth-child(4) { animation-delay: 0.15s; }
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-title {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .card-title i { color: var(--accent); font-size: 0.8rem; }
+
+        /* ─── Form Controls ─── */
+        .form-group {
+            margin-bottom: 14px;
+        }
+        .form-group:last-child { margin-bottom: 0; }
+        .form-label {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 6px;
+        }
+        .form-input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: var(--font);
+            outline: none;
+            transition: border-color var(--transition), box-shadow var(--transition);
+        }
+        .form-input:focus {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(0,212,255,0.08);
+        }
+        .form-input::placeholder { color: var(--text-muted); }
+
+        /* ─── Buttons ─── */
+        .btn-track {
             width: 100%;
             padding: 14px;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
+            border-radius: var(--radius-md);
             border: none;
+            font-size: 0.95rem;
+            font-weight: 700;
+            font-family: var(--font);
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            letter-spacing: 0.3px;
         }
+        .btn-track:active { transform: scale(0.97); }
+
         .btn-start {
-            background: linear-gradient(135deg, #198754, #20c997);
-            color: #fff;
+            background: linear-gradient(135deg, #00c853, #00e676);
+            color: #000;
+            box-shadow: 0 4px 20px rgba(0,200,83,0.3);
         }
-        .btn-start:hover { filter: brightness(1.1); }
+        .btn-start:hover { box-shadow: 0 6px 28px rgba(0,200,83,0.45); filter: brightness(1.05); }
+
         .btn-stop {
-            background: linear-gradient(135deg, #dc3545, #e74c5e);
+            background: linear-gradient(135deg, #d32f2f, #ff5252);
             color: #fff;
+            box-shadow: 0 4px 20px rgba(255,82,82,0.3);
         }
-        .btn-stop:hover { filter: brightness(1.1); }
-        input.form-control {
-            background: #2d2d2d;
-            border: 1px solid #444;
-            color: #fff;
-            border-radius: 10px;
+        .btn-stop:hover { box-shadow: 0 6px 28px rgba(255,82,82,0.45); filter: brightness(1.05); }
+
+        .btn-hidden { display: none !important; }
+
+        /* ─── Status Section ─── */
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            background: var(--bg-glass);
+            border: 1px solid var(--border-subtle);
+            margin-bottom: 14px;
+            transition: all 0.4s ease;
         }
-        input.form-control:focus {
-            background: #333;
-            border-color: var(--accent);
-            color: #fff;
-            box-shadow: none;
+        .status-indicator.active {
+            background: var(--success-dim);
+            border-color: rgba(0,230,118,0.25);
         }
-        .log-box {
-            background: #0d0d0d;
-            border-radius: 10px;
+        .status-indicator.error {
+            background: var(--danger-dim);
+            border-color: rgba(255,82,82,0.25);
+        }
+
+        .status-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            flex-shrink: 0;
+            transition: background 0.3s;
+        }
+        .status-dot.active {
+            background: var(--success);
+            box-shadow: 0 0 8px rgba(0,230,118,0.5);
+            animation: dotPulse 2s ease-in-out infinite;
+        }
+        .status-dot.error {
+            background: var(--danger);
+            box-shadow: 0 0 8px rgba(255,82,82,0.5);
+        }
+        @keyframes dotPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .status-text {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* ─── Info Grid ─── */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .info-item {
             padding: 12px;
-            font-size: 0.78rem;
-            font-family: monospace;
-            color: #aaa;
-            height: 140px;
-            overflow-y: auto;
+            border-radius: var(--radius-md);
+            background: var(--bg-glass);
+            border: 1px solid var(--border-subtle);
+            text-align: center;
         }
-        .log-box p { margin: 2px 0; }
-        .log-success { color: #20c997; }
-        .log-error   { color: #e74c5e; }
+        .info-item.full-width {
+            grid-column: 1 / -1;
+        }
+        .info-icon {
+            font-size: 0.85rem;
+            color: var(--accent);
+            margin-bottom: 4px;
+        }
+        .info-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        .info-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ─── Mini Map ─── */
+        .mini-map-container {
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            height: 180px;
+            border: 1px solid var(--border-subtle);
+            position: relative;
+        }
+        #miniMap {
+            width: 100%;
+            height: 100%;
+        }
+        .map-overlay-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            z-index: 400;
+            pointer-events: none;
+            text-align: center;
+        }
+        .map-overlay-text.hidden { display: none; }
+
+        /* ─── Log Box ─── */
+        .log-box {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            font-size: 0.72rem;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            color: var(--text-secondary);
+            height: 160px;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+        .log-box::-webkit-scrollbar { width: 3px; }
+        .log-box::-webkit-scrollbar-track { background: transparent; }
+        .log-box::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+        .log-box p { margin: 3px 0; line-height: 1.4; }
+        .log-success { color: var(--success); }
+        .log-error   { color: var(--danger); }
+        .log-info    { color: var(--accent); }
+
+        /* ─── Responsive ─── */
+        @media (min-width: 600px) {
+            .page-header { padding: 28px 24px 16px; }
+            .tracker-content { padding: 0 24px 32px; }
+        }
     </style>
 </head>
 <body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
 
-<div class="card-panel">
-    <h1><i class="fa-solid fa-location-dot me-2"></i>Mobil Tracker</h1>
-    <p class="text-muted small mb-3">Cihazınızın konumunu APRSRX sistemine gerçek zamanlı olarak gönderir.</p>
+    <!-- Header -->
+    <header class="page-header">
+        <div class="header-left">
+            <a href="/" class="header-back" title="Ana Sayfaya Dön">
+                <i class="fa-solid fa-arrow-left"></i>
+            </a>
+            <div>
+                <div class="header-title">
+                    <i class="fa-solid fa-location-dot"></i>
+                    Mobil Tracker
+                </div>
+                <div class="header-subtitle">Cihaz konumunuzu gerçek zamanlı gönderin</div>
+            </div>
+        </div>
+    </header>
 
-    <div class="mb-3">
-        <label class="form-label small text-muted">Çağrı İşaretiniz</label>
-        <input type="text" id="callsignInput" class="form-control"
-               placeholder="Örn: TA7KES-9" maxlength="12">
-    </div>
+    <!-- Content -->
+    <main class="tracker-content">
 
-    <div class="mb-3">
-        <label class="form-label small text-muted">Güncelleme Aralığı (saniye)</label>
-        <input type="number" id="intervalInput" class="form-control"
-               value="30" min="10" max="300">
-    </div>
+        <!-- Config Card -->
+        <div class="card">
+            <div class="card-title"><i class="fa-solid fa-sliders"></i> Yapılandırma</div>
+            <div class="form-group">
+                <label class="form-label" for="callsignInput">Çağrı İşaretiniz</label>
+                <input type="text" id="callsignInput" class="form-input"
+                       placeholder="Örn: TA7KES-9" maxlength="12" autocapitalize="characters">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="intervalInput">Güncelleme Aralığı (saniye)</label>
+                <input type="number" id="intervalInput" class="form-input"
+                       value="30" min="10" max="300" inputmode="numeric">
+            </div>
+            <button id="startBtn" class="btn-track btn-start" onclick="startTracking()">
+                <i class="fa-solid fa-play"></i> Takibi Başlat
+            </button>
+            <button id="stopBtn" class="btn-track btn-stop btn-hidden" onclick="stopTracking()">
+                <i class="fa-solid fa-stop"></i> Takibi Durdur
+            </button>
+        </div>
 
-    <button id="startBtn" class="btn-tracker btn-start mb-2" onclick="startTracking()">
-        <i class="fa-solid fa-play me-2"></i>Takibi Başlat
-    </button>
-    <button id="stopBtn" class="btn-tracker btn-stop" onclick="stopTracking()" style="display:none;">
-        <i class="fa-solid fa-stop me-2"></i>Takibi Durdur
-    </button>
-</div>
+        <!-- Status Card -->
+        <div class="card">
+            <div class="card-title"><i class="fa-solid fa-signal"></i> Durum</div>
 
-<div class="card-panel">
-    <div class="d-flex align-items-center mb-3">
-        <span class="status-dot" id="statusDot"></span>
-        <strong id="statusText">Bekleniyor</strong>
-    </div>
-    <div class="info-row">
-        <span class="info-label"><i class="fa-solid fa-location-crosshairs me-1"></i>Enlem</span>
-        <span class="info-value" id="valLat">—</span>
-    </div>
-    <div class="info-row">
-        <span class="info-label"><i class="fa-solid fa-location-crosshairs me-1"></i>Boylam</span>
-        <span class="info-value" id="valLon">—</span>
-    </div>
-    <div class="info-row">
-        <span class="info-label"><i class="fa-solid fa-gauge-high me-1"></i>Hız</span>
-        <span class="info-value" id="valSpeed">—</span>
-    </div>
-    <div class="info-row">
-        <span class="info-label"><i class="fa-solid fa-mountain me-1"></i>Rakım</span>
-        <span class="info-value" id="valAlt">—</span>
-    </div>
-    <div class="info-row">
-        <span class="info-label"><i class="fa-solid fa-clock me-1"></i>Son Gönderim</span>
-        <span class="info-value" id="valTime">—</span>
-    </div>
-</div>
+            <div class="status-indicator" id="statusIndicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span class="status-text" id="statusText">Bekleniyor</span>
+            </div>
 
-<div class="card-panel">
-    <div class="small text-muted mb-2"><i class="fa-solid fa-terminal me-1"></i>Log</div>
-    <div class="log-box" id="logBox"></div>
-</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-icon"><i class="fa-solid fa-location-crosshairs"></i></div>
+                    <div class="info-label">Enlem</div>
+                    <div class="info-value" id="valLat">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon"><i class="fa-solid fa-location-crosshairs"></i></div>
+                    <div class="info-label">Boylam</div>
+                    <div class="info-value" id="valLon">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon"><i class="fa-solid fa-gauge-high"></i></div>
+                    <div class="info-label">Hız</div>
+                    <div class="info-value" id="valSpeed">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-icon"><i class="fa-solid fa-mountain"></i></div>
+                    <div class="info-label">Rakım</div>
+                    <div class="info-value" id="valAlt">—</div>
+                </div>
+                <div class="info-item full-width">
+                    <div class="info-icon"><i class="fa-solid fa-clock"></i></div>
+                    <div class="info-label">Son Gönderim</div>
+                    <div class="info-value" id="valTime">—</div>
+                </div>
+            </div>
+        </div>
 
-<script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
-<script>
-    const socket = io();
-    let trackInterval = null;
-    let watchId = null;
+        <!-- Mini Map Card -->
+        <div class="card">
+            <div class="card-title"><i class="fa-solid fa-map"></i> Konum Haritası</div>
+            <div class="mini-map-container">
+                <div id="miniMap"></div>
+                <div class="map-overlay-text" id="mapOverlay">
+                    <i class="fa-solid fa-satellite-dish" style="font-size:1.2rem;display:block;margin-bottom:6px;"></i>
+                    Konum bekleniyor...
+                </div>
+            </div>
+        </div>
 
-    function log(msg, type = '') {
-        const box = document.getElementById('logBox');
-        const p   = document.createElement('p');
-        p.className = type === 'ok' ? 'log-success' : type === 'err' ? 'log-error' : '';
-        p.textContent = `[${new Date().toLocaleTimeString('tr-TR')}] ${msg}`;
-        box.appendChild(p);
-        box.scrollTop = box.scrollHeight;
-    }
+        <!-- Log Card -->
+        <div class="card">
+            <div class="card-title"><i class="fa-solid fa-terminal"></i> Sistem Günlüğü</div>
+            <div class="log-box" id="logBox"></div>
+        </div>
 
-    function setStatus(active, text) {
-        document.getElementById('statusDot').className = 'status-dot' + (active ? ' active' : '');
-        document.getElementById('statusText').textContent = text;
-    }
+    </main>
 
-    function sendPosition(position) {
-        const callsign = document.getElementById('callsignInput').value.trim().toUpperCase();
-        if (!callsign) { log('Çağrı işareti girilmedi!', 'err'); return; }
+    <!-- Scripts -->
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const socket = io();
+        let trackInterval = null;
+        let watchId = null;
+        let miniMap = null;
+        let miniMarker = null;
+        let miniTrackLine = null;
+        let trackPoints = [];
 
-        const { latitude, longitude, speed, altitude } = position.coords;
+        // Init mini map
+        function initMiniMap() {
+            miniMap = L.map('miniMap', {
+                zoomControl: false,
+                attributionControl: false,
+                dragging: true,
+                scrollWheelZoom: false,
+            }).setView([40.8, 37.3], 10);
 
-        document.getElementById('valLat').textContent   = latitude.toFixed(6) + '°';
-        document.getElementById('valLon').textContent   = longitude.toFixed(6) + '°';
-        document.getElementById('valSpeed').textContent = speed != null ? (speed * 3.6).toFixed(1) + ' km/h' : '—';
-        document.getElementById('valAlt').textContent   = altitude != null ? altitude.toFixed(0) + ' m' : '—';
-        document.getElementById('valTime').textContent  = new Date().toLocaleTimeString('tr-TR');
+            L.tileLayer('https://mt0.google.com/vt/lyrs=y&hl=tr&x={x}&y={y}&z={z}', {
+                maxZoom: 18,
+            }).addTo(miniMap);
+        }
+        initMiniMap();
 
-        socket.emit('private_location', {
-            callsign,
-            lat: latitude,
-            lon: longitude,
-            speed: speed || 0,
-            alt: altitude || 0
-        });
+        function updateMiniMap(lat, lon) {
+            document.getElementById('mapOverlay').classList.add('hidden');
 
-        log(`Konum gönderildi → ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`, 'ok');
-        setStatus(true, 'Aktif - Gönderildi');
-    }
+            if (!miniMarker) {
+                const icon = L.divIcon({
+                    html: '<div style="width:14px;height:14px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:0 0 12px rgba(0,212,255,0.6);"></div>',
+                    className: '',
+                    iconSize: [14, 14],
+                    iconAnchor: [7, 7]
+                });
+                miniMarker = L.marker([lat, lon], { icon }).addTo(miniMap);
+            } else {
+                miniMarker.setLatLng([lat, lon]);
+            }
 
-    function onGeoError(err) {
-        log(`Konum alınamadı: ${err.message}`, 'err');
-        setStatus(false, 'Konum Hatası');
-    }
+            trackPoints.push([lat, lon]);
+            if (miniTrackLine) {
+                miniTrackLine.setLatLngs(trackPoints);
+            } else if (trackPoints.length >= 2) {
+                miniTrackLine = L.polyline(trackPoints, {
+                    color: '#00d4ff',
+                    weight: 3,
+                    opacity: 0.7,
+                }).addTo(miniMap);
+            }
 
-    function startTracking() {
-        const callsign = document.getElementById('callsignInput').value.trim();
-        if (!callsign) { log('Lütfen çağrı işareti girin!', 'err'); return; }
-
-        if (!navigator.geolocation) {
-            log('Tarayıcınız konum desteklemiyor.', 'err');
-            return;
+            miniMap.setView([lat, lon], 15, { animate: true });
         }
 
-        const interval = parseInt(document.getElementById('intervalInput').value) * 1000 || 30000;
+        function log(msg, type = '') {
+            const box = document.getElementById('logBox');
+            const p = document.createElement('p');
+            p.className = type === 'ok' ? 'log-success' : type === 'err' ? 'log-error' : 'log-info';
+            p.textContent = `[${new Date().toLocaleTimeString('tr-TR')}] ${msg}`;
+            box.appendChild(p);
+            box.scrollTop = box.scrollHeight;
+        }
 
-        // İlk anlık konum
-        navigator.geolocation.getCurrentPosition(sendPosition, onGeoError, {
-            enableHighAccuracy: true, timeout: 10000
-        });
+        function setStatus(state, text) {
+            const indicator = document.getElementById('statusIndicator');
+            const dot = document.getElementById('statusDot');
+            const textEl = document.getElementById('statusText');
 
-        // Periyodik gönderim
-        trackInterval = setInterval(() => {
+            indicator.className = 'status-indicator' + (state === 'active' ? ' active' : state === 'error' ? ' error' : '');
+            dot.className = 'status-dot' + (state === 'active' ? ' active' : state === 'error' ? ' error' : '');
+            textEl.textContent = text;
+        }
+
+        function sendPosition(position) {
+            const callsign = document.getElementById('callsignInput').value.trim().toUpperCase();
+            if (!callsign) { log('Çağrı işareti girilmedi!', 'err'); return; }
+
+            const { latitude, longitude, speed, altitude } = position.coords;
+
+            document.getElementById('valLat').textContent   = latitude.toFixed(6) + '°';
+            document.getElementById('valLon').textContent   = longitude.toFixed(6) + '°';
+            document.getElementById('valSpeed').textContent = speed != null ? (speed * 3.6).toFixed(1) + ' km/h' : '—';
+            document.getElementById('valAlt').textContent   = altitude != null ? altitude.toFixed(0) + ' m' : '—';
+            document.getElementById('valTime').textContent  = new Date().toLocaleTimeString('tr-TR');
+
+            socket.emit('private_location', {
+                callsign,
+                lat: latitude,
+                lon: longitude,
+                speed: speed || 0,
+                alt: altitude || 0
+            });
+
+            updateMiniMap(latitude, longitude);
+            log(`Konum gönderildi → ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`, 'ok');
+            setStatus('active', 'Aktif — Gönderildi');
+        }
+
+        function onGeoError(err) {
+            log(`Konum alınamadı: ${err.message}`, 'err');
+            setStatus('error', 'Konum Hatası');
+        }
+
+        function startTracking() {
+            const callsign = document.getElementById('callsignInput').value.trim();
+            if (!callsign) { log('Lütfen çağrı işareti girin!', 'err'); return; }
+
+            if (!navigator.geolocation) {
+                log('Tarayıcınız konum desteklemiyor.', 'err');
+                return;
+            }
+
+            const interval = parseInt(document.getElementById('intervalInput').value) * 1000 || 30000;
+
+            // Initial position
             navigator.geolocation.getCurrentPosition(sendPosition, onGeoError, {
                 enableHighAccuracy: true, timeout: 10000
             });
-        }, interval);
 
-        document.getElementById('startBtn').style.display = 'none';
-        document.getElementById('stopBtn').style.display  = 'block';
-        setStatus(true, 'Aktif');
-        log(`Takip başladı. Callsign: ${callsign}, Aralık: ${interval / 1000}s`, 'ok');
-    }
+            // Periodic
+            trackInterval = setInterval(() => {
+                navigator.geolocation.getCurrentPosition(sendPosition, onGeoError, {
+                    enableHighAccuracy: true, timeout: 10000
+                });
+            }, interval);
 
-    function stopTracking() {
-        if (trackInterval) clearInterval(trackInterval);
-        if (watchId)       navigator.geolocation.clearWatch(watchId);
-        trackInterval = null;
-        watchId       = null;
+            document.getElementById('startBtn').classList.add('btn-hidden');
+            document.getElementById('stopBtn').classList.remove('btn-hidden');
+            document.getElementById('callsignInput').disabled = true;
+            document.getElementById('intervalInput').disabled = true;
+            setStatus('active', 'Aktif');
+            log(`Takip başladı. Callsign: ${callsign}, Aralık: ${interval / 1000}s`, 'ok');
+        }
 
-        document.getElementById('startBtn').style.display = 'block';
-        document.getElementById('stopBtn').style.display  = 'none';
-        setStatus(false, 'Durduruldu');
-        log('Takip durduruldu.', '');
-    }
+        function stopTracking() {
+            if (trackInterval) clearInterval(trackInterval);
+            if (watchId) navigator.geolocation.clearWatch(watchId);
+            trackInterval = null;
+            watchId = null;
 
-    socket.on('connect',    () => log('Sunucuya bağlandı.', 'ok'));
-    socket.on('disconnect', () => { log('Bağlantı kesildi.', 'err'); setStatus(false, 'Bağlantı Kesildi'); });
-</script>
+            document.getElementById('startBtn').classList.remove('btn-hidden');
+            document.getElementById('stopBtn').classList.add('btn-hidden');
+            document.getElementById('callsignInput').disabled = false;
+            document.getElementById('intervalInput').disabled = false;
+            setStatus('idle', 'Durduruldu');
+            log('Takip durduruldu.', '');
+        }
+
+        socket.on('connect',    () => log('Sunucuya bağlandı.', 'ok'));
+        socket.on('disconnect', () => { log('Bağlantı kesildi.', 'err'); setStatus('error', 'Bağlantı Kesildi'); });
+    </script>
 </body>
 </html>

@@ -2,7 +2,11 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="APRSRX — APRS Canlı Harita ve Mesajlaşma Sistemi Girişi">
     <title>APRSRX — Giriş</title>
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%2342a5f5' d='M432 208H80c-26.5 0-48 21.5-48 48v160c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V256c0-26.5-21.5-48-48-48zm-176 96c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64z'/%3E%3C/svg%3E">
@@ -108,7 +112,9 @@
             padding: 48px 44px;
             width: 100%;
             max-width: 420px;
+            margin: 16px;
             backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             box-shadow:
                 0 0 0 1px rgba(0, 212, 255, 0.05),
                 0 20px 60px rgba(0, 0, 0, 0.6),
@@ -118,6 +124,15 @@
         @keyframes cardIn {
             from { opacity: 0; transform: translateY(30px) scale(0.95); }
             to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 480px) {
+            .login-card { padding: 36px 24px; }
+            .logo-title { font-size: 1.5rem; }
+            .form-input { padding: 15px 14px 15px 40px; font-size: 1rem; }
+            .btn-login { padding: 16px; font-size: 1rem; min-height: 52px; }
+            .toggle-pwd { padding: 8px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
         }
 
         /* ─── Logo ─── */
