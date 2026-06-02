@@ -1229,11 +1229,8 @@
 <script>
     // ─── Jinja2 Config ────────────────────────────────────────────────────────
     const MY_CALLSIGN  = "{{ config.get('aprs', {}).get('callsign', 'NOCALL') }}";
-    const TRACKED_CALLS = [
-        {% for t in config.get('tracked_callsigns', []) %}
-        "{{ t }}"{% if not loop.last %},{% endif %}
-        {% endfor %}
-    ];
+    const TRACKED_CALLS_STR = '{{ config.get("tracked_callsigns", []) | tojson | safe }}';
+    const TRACKED_CALLS = JSON.parse(TRACKED_CALLS_STR);
     const ALL_ALLOWED = [MY_CALLSIGN, ...TRACKED_CALLS];
 
     function isTrackedCallsign(cs) {
