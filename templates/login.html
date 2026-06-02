@@ -413,16 +413,7 @@
             this.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Doğrulanıyor...';
         });
 
-        // Service Worker Kaydı (PWA)
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').then(reg => {
-                    console.log('ServiceWorker registered:', reg.scope);
-                }).catch(err => {
-                    console.log('ServiceWorker registration failed:', err);
-                });
-            });
-        }
+
     </script>
 </body>
 </html>
