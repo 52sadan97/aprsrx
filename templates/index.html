@@ -1838,10 +1838,16 @@
         syncDateControls(localISOTime);
         loadHistory(localISOTime);
 
-        // Bildirim izni iste
-        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
-            Notification.requestPermission();
-        }
+        // Kullanıcı sayfayla etkileşime geçtiğinde bildirim izni iste ve sesi aktifleştir
+        let hasInteracted = false;
+        document.body.addEventListener('click', () => {
+            if (!hasInteracted) {
+                if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+                    Notification.requestPermission();
+                }
+                hasInteracted = true;
+            }
+        });
     });
 
     // ─── Live APRS Packets ────────────────────────────────────────────────────

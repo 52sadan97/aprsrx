@@ -560,16 +560,25 @@
             textEl.textContent = text;
         }
 
-        function sendPosition(position) {
-            const callsign = document.getElementById('callsignInput').value.trim().toUpperCase();
-            if (!callsign) { log('Çağrı işareti girilmedi!', 'err'); return; }
+        let lastPosition = null;
 
+        function updatePositionData(position) {
+            lastPosition = position;
             const { latitude, longitude, speed, altitude } = position.coords;
 
             document.getElementById('valLat').textContent   = latitude.toFixed(6) + '°';
             document.getElementById('valLon').textContent   = longitude.toFixed(6) + '°';
             document.getElementById('valSpeed').textContent = speed != null ? (speed * 3.6).toFixed(1) + ' km/h' : '—';
             document.getElementById('valAlt').textContent   = altitude != null ? altitude.toFixed(0) + ' m' : '—';
+        }
+
+        function sendLastPosition() {
+            if (!lastPosition) return;
+            const callsign = document.getElementById('callsignInput').value.trim().toUpperCase();
+            if (!callsign) { log('Çağrı işareti girilmedi!', 'err'); return; }
+
+            const { latitude, longitude, speed, altitude } = lastPosition.coords;
+
             document.getElementById('valTime').textContent  = new Date().toLocaleTimeString('tr-TR');
 
             socket.emit('private_location', {
@@ -582,6 +591,11 @@
 
             updateMiniMap(latitude, longitude);
             log(`Konum gönderildi → ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`, 'ok');
+            
+            const indicator = document.getElementById('statusIndicator');
+            indicator.style.opacity = '0.3';
+            setTimeout(() => { indicator.style.opacity = '1'; }, 200);
+
             setStatus('active', 'Aktif — Gönderildi');
         }
 
@@ -601,17 +615,14 @@
 
             const interval = parseInt(document.getElementById('intervalInput').value) * 1000 || 30000;
 
-            // Initial position
-            navigator.geolocation.getCurrentPosition(sendPosition, onGeoError, {
-                enableHighAccuracy: true, timeout: 10000
+            watchId = navigator.geolocation.watchPosition(updatePositionData, onGeoError, {
+                enableHighAccuracy: true, timeout: 10000, maximumAge: 0
             });
 
-            // Periodic
-            trackInterval = setInterval(() => {
-                navigator.geolocation.getCurrentPosition(sendPosition, onGeoError, {
-                    enableHighAccuracy: true, timeout: 10000
-                });
-            }, interval);
+            // İlk veriyi almak için az bekle ve gönder
+            setTimeout(sendLastPosition, 2000);
+
+            trackInterval = setInterval(sendLastPosition, interval);
 
             document.getElementById('startBtn').classList.add('btn-hidden');
             document.getElementById('stopBtn').classList.remove('btn-hidden');
@@ -634,6 +645,15 @@
             setStatus('idle', 'Durduruldu');
             log('Takip durduruldu.', '');
         }
+
+        document.getElementById('intervalInput').addEventListener('change', function() {
+            if (trackInterval) {
+                clearInterval(trackInterval);
+                const interval = parseInt(this.value) * 1000 || 30000;
+                trackInterval = setInterval(sendLastPosition, interval);
+                log(`Gönderim aralığı güncellendi: ${interval / 1000}s`, 'ok');
+            }
+        });
 
         socket.on('connect',    () => log('Sunucuya bağlandı.', 'ok'));
         socket.on('disconnect', () => { log('Bağlantı kesildi.', 'err'); setStatus('error', 'Bağlantı Kesildi'); });
