@@ -1410,6 +1410,61 @@
     const chatPlaceholder = document.getElementById('chat-placeholder');
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
+    function playNotificationSound() {
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1046.50, ctx.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0, ctx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.05);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+            
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.5);
+        } catch(e) { console.log('Ses çalınamadı', e); }
+    }
+
+    function showNotification(title, body) {
+        playNotificationSound();
+
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+            window.Capacitor.Plugins.LocalNotifications.schedule({
+                notifications: [{
+                    title: title,
+                    body: body,
+                    id: new Date().getTime(),
+                    schedule: { at: new Date(Date.now() + 100) },
+                    sound: null,
+                    attachments: null,
+                    actionTypeId: "",
+                    extra: null
+                }]
+            });
+            return;
+        }
+
+        if ("Notification" in window) {
+            if (Notification.permission === "granted") {
+                new Notification(title, { body: body });
+            } else if (Notification.permission !== "denied") {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        new Notification(title, { body: body });
+                    }
+                });
+            }
+        }
+    }
+
     function haversineKm(lat1, lon1, lat2, lon2) {
         const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
         const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
@@ -1782,6 +1837,11 @@
         const localISOTime = (new Date(today - offset)).toISOString().split('T')[0];
         syncDateControls(localISOTime);
         loadHistory(localISOTime);
+
+        // Bildirim izni iste
+        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+            Notification.requestPermission();
+        }
     });
 
     // ─── Live APRS Packets ────────────────────────────────────────────────────
@@ -1809,12 +1869,22 @@
         if (packet.format === 'message') {
             const receiver = (packet.addresse || '').trim();
             let text       = (packet.message_text || '').trim();
+            const isSelf   = callsign.toUpperCase().startsWith(MY_CALLSIGN.split('-')[0].toUpperCase());
+
+            if (isSelf && !packet.response) {
+                return; // Kendi mesajımız socket'ten tekrar gelirse yoksay
+            }
+
             if (!text && packet.response) {
                 if      (packet.response === 'ack') text = `✅ [İletildi - ACK] Mesaj No: ${packet.msgNo || ''}`;
                 else if (packet.response === 'rej') text = `❌ [Reddedildi - REJ] Mesaj No: ${packet.msgNo || ''}`;
                 else                                text = `[Sistem: ${packet.response}]`;
             }
-            appendMessage(callsign, receiver, text, false);
+            appendMessage(callsign, receiver, text, isSelf);
+
+            if (!isSelf) {
+                showNotification(packet.response ? `Sistem Bilgisi: ${callsign}` : `Yeni Mesaj: ${callsign}`, text);
+            }
         }
     });
 
