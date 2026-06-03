@@ -1441,14 +1441,10 @@
                 notifications: [{
                     title: title,
                     body: body,
-                    id: new Date().getTime(),
-                    schedule: { at: new Date(Date.now() + 100) },
-                    sound: null,
-                    attachments: null,
-                    actionTypeId: "",
-                    extra: null
+                    id: Math.floor(Math.random() * 2147483647), // JS Hatasını Çözer: Java int sınırları içinde olmalı
+                    channelId: "APRS_CHANNEL" // MainActivity'de oluşturduğumuz HIGH priority kanalı
                 }]
-            });
+            }).catch(e => console.error("Notification Error: ", e));
             return;
         }
 
