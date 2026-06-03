@@ -1719,7 +1719,11 @@
         chatContainer.innerHTML = '';
 
         try {
-            const r    = await fetch(url);
+            const r = await fetch(url);
+            if (!r.ok) {
+                if (r.status === 401) window.location.href = '/login';
+                throw new Error(`Sunucu Hatası (${r.status})`);
+            }
             const data = await r.json();
             if (data.status !== 'success') return;
 
