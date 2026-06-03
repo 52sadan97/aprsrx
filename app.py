@@ -595,16 +595,20 @@ def handle_send_message(data):
         )
         conn.commit()
         conn.close()
+        # SADECE Socket.IO istemcilerine özel mesaj olarak dağıt (Web/Mobil)
+        packet_parsed = {
+            "from": my_call,
+            "addresse": target,
+            "format": "message",
+            "message_text": msg,
+            "timestamp": now
+        }
+        socketio.emit('aprs_packet', packet_parsed)
         
-        # Bağlı TCP istemcilerine yankıla (echo)
-        for client_fd in tcp_clients:
-            try:
-                client_fd.write(packet_raw + "\r\n")
-                client_fd.flush()
-            except Exception as e:
-                print(f"[Echo] TCP istemcisine mesaj gönderilirken hata: {e}")
+        # TCP İstemcilere yankılamıyoruz (IGate'ler veya APRSDroid). 
+        # Çünkü IGate'ler bu paketi alıp aprs.fi'ye yönlendirebilir.
         
-        print(f"Mesaj Gönderildi (Sadece Yerel Ağ): {packet_raw}")
+        print(f"Özel Mesaj Gönderildi (Sadece Socket.IO): {packet_raw}")
         return {"status": "success", "packet": packet_raw}
     except Exception as e:
         print(f"Mesaj Gönderim Hatası: {e}")
