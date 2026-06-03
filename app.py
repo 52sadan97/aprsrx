@@ -575,11 +575,12 @@ def api_settings():
 def handle_send_message(data):
     target = data.get('target', '')
     msg = data.get('message', '')
+    callsign = data.get('callsign', '').strip()
     
     if not target or not msg:
         return {"status": "error", "message": "Eksik bilgi"}
     
-    my_call = config.get("aprs", {}).get("callsign", "N0CALL")
+    my_call = callsign.upper() if callsign else config.get("aprs", {}).get("callsign", "N0CALL")
     
     # SADECE kendi ağımızdaki TCP istemcilerine gönder (Global APRS ağına gitmez)
     target_padded = target.ljust(9)[:9]
