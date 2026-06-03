@@ -1877,10 +1877,6 @@
             let text       = (packet.message_text || '').trim();
             const isSelf   = callsign.toUpperCase().startsWith(MY_CALLSIGN.split('-')[0].toUpperCase());
 
-            if (isSelf && !packet.response) {
-                return; // Kendi mesajımız socket'ten tekrar gelirse yoksay
-            }
-
             if (!text && packet.response) {
                 if      (packet.response === 'ack') text = `✅ [İletildi - ACK] Mesaj No: ${packet.msgNo || ''}`;
                 else if (packet.response === 'rej') text = `❌ [Reddedildi - REJ] Mesaj No: ${packet.msgNo || ''}`;
@@ -1901,7 +1897,16 @@
         const text     = msgInput.value.trim();
         if (!target) { alert('Lütfen hedefin çağrı işaretini girin!'); return; }
         if (!text) return;
-        appendMessage('Ben', target, text, true);
+        
+        // Bildirim izinlerini ve sesi kullanıcı etkileşimi anında başlat
+        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+            Notification.requestPermission();
+        }
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            ctx.resume();
+        } catch(e) {}
+
         socket.emit('send_message', { target, message: text }, (resp) => {
             if (resp?.status === 'error') alert('Mesaj Gönderilemedi: ' + resp.message);
         });
