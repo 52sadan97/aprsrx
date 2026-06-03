@@ -478,7 +478,11 @@ def service_worker():
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html', config=config)
+    response = make_response(render_template('index.html', config=config))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/tracker')
 @login_required
