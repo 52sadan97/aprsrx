@@ -170,8 +170,8 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return distance
 
 # Korgan koordinatları ve hoşgeldin yarıçapı
-KORGAN_LAT  = 40.8
-KORGAN_LON  = 37.3
+KORGAN_LAT  = 40.822
+KORGAN_LON  = 37.346
 KORGAN_R_KM = 5.0
 
 def build_filter(callsign, tracked):
@@ -192,7 +192,7 @@ def build_filter(callsign, tracked):
             filter_parts.append(wildcard)
     buddy_filter  = "b/" + "/".join(filter_parts)
     # Korgan 5km yarıçap filtresi — takip listesinden bağımsız herkesi yakala
-    radius_filter = f"r/{KORGAN_LAT}/{KORGAN_LON}/{KORGAN_R_KM}"
+    radius_filter = f"r/{KORGAN_LAT}/{KORGAN_LON}/{int(KORGAN_R_KM)}"
     return f"{buddy_filter} {radius_filter}"
 
 
