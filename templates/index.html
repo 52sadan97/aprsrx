@@ -1434,30 +1434,44 @@
     }
 
     function showNotification(title, body) {
-        playNotificationSound();
+        try {
+            playNotificationSound();
 
-        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
-            window.Capacitor.Plugins.LocalNotifications.schedule({
-                notifications: [{
-                    title: title,
-                    body: body,
-                    id: Math.floor(Math.random() * 2147483647), // JS Hatasını Çözer: Java int sınırları içinde olmalı
-                    channelId: "APRS_CHANNEL" // MainActivity'de oluşturduğumuz HIGH priority kanalı
-                }]
-            }).catch(e => console.error("Notification Error: ", e));
-            return;
-        }
-
-        if ("Notification" in window) {
-            if (Notification.permission === "granted") {
-                new Notification(title, { body: body });
-            } else if (Notification.permission !== "denied") {
-                Notification.requestPermission().then(permission => {
-                    if (permission === "granted") {
-                        new Notification(title, { body: body });
-                    }
-                });
+            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+                // Android'de kanallar bir kez oluşturulunca önceliği değiştirilemez. 
+                // Bu yüzden eski kanal yerine "aprs_high_v1" adında GICIR GICIR yeni bir kanal açıyoruz.
+                window.Capacitor.Plugins.LocalNotifications.createChannel({
+                    id: "aprs_high_v1",
+                    name: "APRS Pop-up Mesajları",
+                    description: "Üstten düşen mesaj bildirimleri",
+                    importance: 5, // 5 = HIGH IMPORTANCE (Heads-up / Pop-up için şart)
+                    visibility: 1
+                }).then(() => {
+                    window.Capacitor.Plugins.LocalNotifications.schedule({
+                        notifications: [{
+                            title: String(title),
+                            body: String(body),
+                            id: Math.floor(Math.random() * 2147483647),
+                            channelId: "aprs_high_v1"
+                        }]
+                    }).catch(e => console.error("Notification Error: ", e));
+                }).catch(e => console.error("Channel Create Error: ", e));
+                return;
             }
+
+            if ("Notification" in window) {
+                if (Notification.permission === "granted") {
+                    new Notification(title, { body: body });
+                } else if (Notification.permission !== "denied") {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === "granted") {
+                            new Notification(title, { body: body });
+                        }
+                    });
+                }
+            }
+        } catch(globalErr) {
+            console.error("showNotification global error:", globalErr);
         }
     }
 
@@ -1850,38 +1864,48 @@
     socket.on('connect', () => console.log('Sunucuya bağlanıldı!'));
 
     socket.on('aprs_packet', async (packet) => {
-        const callsign = packet.from;
-        if (!callsign) return;
+        try {
+            const callsign = packet.from;
+            if (!callsign) return;
 
-        if (packet.latitude && packet.longitude) {
-            const latlng    = [packet.latitude, packet.longitude];
-            const popupText = `
-                <div class="popup-callsign">${callsign}</div>
-                ${packet.comment ? `<div class="popup-comment">${packet.comment}</div>` : ''}
-                <button class="popup-btn" onclick="setTarget('${callsign}')">
-                    <i class="fa-solid fa-comment"></i> Mesaj Yaz
-                </button>`;
+            if (packet.latitude && packet.longitude) {
+                const latlng    = [packet.latitude, packet.longitude];
+                const popupText = `
+                    <div class="popup-callsign">${callsign}</div>
+                    ${packet.comment ? `<div class="popup-comment">${packet.comment}</div>` : ''}
+                    <button class="popup-btn" onclick="setTarget('${callsign}')">
+                        <i class="fa-solid fa-comment"></i> Mesaj Yaz
+                    </button>`;
 
-            await addLiveSegment(callsign, latlng);
-            if (!rawPoints[callsign]) rawPoints[callsign] = [];
-            rawPoints[callsign].push(latlng);
-            upsertMarker(callsign, latlng, packet.symbol_table, packet.symbol, popupText);
-        }
-
-        if (packet.format === 'message') {
-            const receiver = (packet.addresse || '').trim();
-            let text       = (packet.message_text || '').trim();
-            const isSelf   = callsign.toUpperCase().startsWith(MY_CALLSIGN.split('-')[0].toUpperCase());
-
-            if (!text && packet.response) {
-                if      (packet.response === 'ack') text = `✅ [İletildi - ACK] Mesaj No: ${packet.msgNo || ''}`;
-                else if (packet.response === 'rej') text = `❌ [Reddedildi - REJ] Mesaj No: ${packet.msgNo || ''}`;
-                else                                text = `[Sistem: ${packet.response}]`;
+                await addLiveSegment(callsign, latlng);
+                if (!rawPoints[callsign]) rawPoints[callsign] = [];
+                rawPoints[callsign].push(latlng);
+                upsertMarker(callsign, latlng, packet.symbol_table, packet.symbol, popupText);
             }
-            appendMessage(callsign, receiver, text, isSelf);
 
-            if (!isSelf) {
-                showNotification(packet.response ? `Sistem Bilgisi: ${callsign}` : `Yeni Mesaj: ${callsign}`, text);
+            if (packet.format === 'message') {
+                const receiver = (packet.addresse || '').trim();
+                let text       = (packet.message_text || '').trim();
+                const isSelf   = callsign.toUpperCase().startsWith(MY_CALLSIGN.split('-')[0].toUpperCase());
+
+                if (!text && packet.response) {
+                    if      (packet.response === 'ack') text = `✅ [İletildi - ACK] Mesaj No: ${packet.msgNo || ''}`;
+                    else if (packet.response === 'rej') text = `❌ [Reddedildi - REJ] Mesaj No: ${packet.msgNo || ''}`;
+                    else                                text = `[Sistem: ${packet.response}]`;
+                }
+                appendMessage(callsign, receiver, text, isSelf);
+
+                if (!isSelf) {
+                    showNotification(packet.response ? `Sistem Bilgisi: ${callsign}` : `Yeni Mesaj: ${callsign}`, text);
+                }
+            }
+        } catch (err) {
+            console.error("APRS Packet Error: ", err);
+            if (chatContainer) {
+                const errDiv = document.createElement('div');
+                errDiv.style.cssText = 'color:#ff9800;padding:10px;font-size:0.8rem;';
+                errDiv.innerHTML = `<strong>Yakalanan JS Hatası:</strong> ${err.message} <br> Stack: ${err.stack}`;
+                chatContainer.appendChild(errDiv);
             }
         }
     });

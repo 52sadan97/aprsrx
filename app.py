@@ -455,7 +455,7 @@ def login():
         password = request.form.get('password', '')
         if password == APP_PASSWORD:
             session['logged_in'] = True
-            return redirect(url_for('index'))
+            return redirect(url_for('index', v=4))
         else:
             error = 'Hatalı şifre! Lütfen tekrar deneyin.'
     return render_template('login.html', error=error)
