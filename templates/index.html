@@ -292,6 +292,12 @@
             white-space: nowrap;
             transform: translate(-12px, -12px);
         }
+        /* Takip edilmeyen istasyonlar — sadece küçük ikon */
+        .aprs-marker-wrapper.untracked {
+            transform: translate(-8px, -8px);
+            opacity: 0.4;
+            pointer-events: auto;
+        }
         .aprs-marker-inner {
             position: relative;
             width: 24px; height: 24px;
@@ -299,6 +305,9 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+        }
+        .aprs-marker-wrapper.untracked .aprs-marker-inner {
+            width: 16px; height: 16px;
         }
         .aprs-pulse-ring {
             position: absolute;
@@ -316,9 +325,15 @@
             align-items: center;
             justify-content: center;
         }
+        .aprs-marker-wrapper.untracked .aprs-symbol-box {
+            width: 16px; height: 16px;
+        }
         .aprs-symbol-box img {
             width: 24px; height: 24px;
             image-rendering: pixelated;
+        }
+        .aprs-marker-wrapper.untracked .aprs-symbol-box img {
+            width: 16px; height: 16px;
         }
         .aprs-marker-label {
             margin-left: 6px;
@@ -1648,23 +1663,33 @@
     }
 
     function buildIconHTML(callsign, symbolTable, symbol) {
-        const tracked    = isTrackedCallsign(callsign);
-        const color      = tracked ? getColor(callsign) : '#888888';
-        const labelClass = tracked ? 'tracked' : 'untracked';
-        const content    = (symbol && symbolTable)
+        const tracked = isTrackedCallsign(callsign);
+
+        if (!tracked) {
+            // Takip edilmeyen: sadece küçük sembol ikon, etiket YOK
+            const iconContent = (symbol && symbolTable)
+                ? getAprsIcon(symbolTable, symbol)
+                : `<i class="fa-solid fa-circle" style="color:#888;font-size:10px;"></i>`;
+            return `
+                <div class="aprs-marker-wrapper untracked">
+                    <div class="aprs-marker-inner">
+                        <div class="aprs-symbol-box">${iconContent}</div>
+                    </div>
+                </div>`;
+        }
+
+        // Takip edilen: tam görünüm — renk, pulse ring, etiket
+        const color   = getColor(callsign);
+        const content = (symbol && symbolTable)
             ? getAprsIcon(symbolTable, symbol)
             : `<i class="fa-solid fa-location-dot" style="color:${color};font-size:18px;"></i>`;
-        // Takip edilmeyenler için pulse ring gösterme (kalabalık harita için)
-        const pulseRing = tracked
-            ? `<div class="aprs-pulse-ring" style="border-color:${color};"></div>`
-            : '';
         return `
-            <div class="aprs-marker-wrapper" style="${tracked ? '' : 'opacity:0.55;'}">
+            <div class="aprs-marker-wrapper">
                 <div class="aprs-marker-inner">
-                    ${pulseRing}
+                    <div class="aprs-pulse-ring" style="border-color:${color};"></div>
                     <div class="aprs-symbol-box">${content}</div>
                 </div>
-                <div class="aprs-marker-label ${labelClass}" style="border-color:${color}33;">${callsign}</div>
+                <div class="aprs-marker-label tracked" style="border-color:${color}33;">${callsign}</div>
             </div>`;
     }
 
@@ -1874,13 +1899,19 @@
             if (!callsign) return;
 
             if (packet.latitude && packet.longitude) {
-                const latlng    = [packet.latitude, packet.longitude];
-                const popupText = `
-                    <div class="popup-callsign">${callsign}</div>
-                    ${packet.comment ? `<div class="popup-comment">${packet.comment}</div>` : ''}
-                    <button class="popup-btn" onclick="setTarget('${callsign}')">
-                        <i class="fa-solid fa-comment"></i> Mesaj Yaz
-                    </button>`;
+                const latlng  = [packet.latitude, packet.longitude];
+                const tracked = isTrackedCallsign(callsign);
+                const popupText = tracked
+                    ? `<div class="popup-callsign">${callsign}</div>
+                       ${packet.comment ? `<div class="popup-comment">${packet.comment}</div>` : ''}
+                       <button class="popup-btn" onclick="setTarget('${callsign}')">
+                           <i class="fa-solid fa-comment"></i> Mesaj Yaz
+                       </button>`
+                    : `<div class="popup-callsign" style="color:var(--text-secondary)">${callsign}</div>
+                       ${packet.comment ? `<div class="popup-comment">${packet.comment}</div>` : ''}
+                       <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">
+                           <i class="fa-solid fa-info-circle"></i> Bölge APRS İstasyonu
+                       </div>`;
 
                 await addLiveSegment(callsign, latlng);
                 if (!rawPoints[callsign]) rawPoints[callsign] = [];
