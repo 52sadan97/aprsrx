@@ -14,6 +14,8 @@ import sqlite3
 import threading
 import datetime
 import traceback
+import urllib.request
+import urllib.parse
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371  # Dünya yarıçapı (km)
@@ -24,6 +26,21 @@ def haversine(lat1, lon1, lat2, lon2):
         math.sin(dLon/2) * math.sin(dLon/2)
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     return R * c
+
+def send_telegram_notification(message):
+    try:
+        cfg = load_config()
+        tg_cfg = cfg.get("telegram", {})
+        bot_token = tg_cfg.get("bot_token")
+        chat_id = tg_cfg.get("chat_id")
+        
+        if bot_token and chat_id:
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            data = urllib.parse.urlencode({'chat_id': chat_id, 'text': message}).encode('utf-8')
+            req = urllib.request.Request(url, data=data)
+            urllib.request.urlopen(req, timeout=5)
+    except Exception as e:
+        print(f"Telegram bildirim hatası: {e}")
 
 import functools
 app = Flask(__name__)
@@ -353,6 +370,7 @@ def process_parsed_packet(packet):
                                 AIS.sendall(pkt_raw)
                             except: pass
                         print(f"✅ Korgan Hoşgeldin → {pkt_callsign} ({dist_korgan:.1f}km): {pkt_raw}")
+                        send_telegram_notification(f"🚀 Korgan'a Yeni Giriş: {pkt_callsign} (Mesafe: {dist_korgan:.1f}km). Karşılama mesajı gönderildi.")
                         cw.execute(
                             "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
                             (my_callsign, pkt_callsign, f"[Sistem-Oto] {msg_text}", now)
@@ -395,6 +413,7 @@ def process_parsed_packet(packet):
                                 AIS.sendall(pkt_raw)
                             except: pass
                         print(f"✅ Fatsa Hoşgeldin → {pkt_callsign} ({dist_fatsa:.1f}km): {pkt_raw}")
+                        send_telegram_notification(f"🚀 Fatsa'ya Yeni Giriş: {pkt_callsign} (Mesafe: {dist_fatsa:.1f}km). Karşılama mesajı gönderildi.")
                         cw.execute(
                             "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
                             (my_callsign, pkt_callsign, f"[Sistem-Oto-Fatsa] {msg_text}", now)
