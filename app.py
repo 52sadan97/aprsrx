@@ -101,6 +101,19 @@ def init_db():
             timestamp REAL
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS outgoing_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender TEXT,
+            receiver TEXT,
+            message_text TEXT,
+            queued_at REAL,
+            status TEXT DEFAULT 'pending',
+            attempts INTEGER DEFAULT 0,
+            last_attempt REAL,
+            sent_at REAL
+        )
+    ''')
     
     # Startup'ta sadece genel eski temizliği yap
     thirty_days_ago = time.time() - (30 * 24 * 60 * 60)
@@ -152,6 +165,76 @@ def db_cleanup_task():
 
 # Arka planda temizlik thread'ini başlat
 eventlet.spawn(db_cleanup_task)
+
+def message_sender_task():
+    """
+    Giden mesaj kuyruğunu (outgoing_queue) her 5 saniyede kontrol eder.
+    Pending mesajları APRS-IS üzerinden gönderir.
+    Sayfa kapalı olsa bile çalışır.
+    """
+    global AIS
+    MAX_ATTEMPTS = 5
+    RETRY_DELAY  = 30  # saniye — başarısız sonrası bekleme
+
+    while True:
+        try:
+            if AIS:  # APRS-IS bağlantısı aktifse
+                now  = time.time()
+                conn = sqlite3.connect(DB_FILE)
+                c    = conn.cursor()
+
+                # 'pending' + yeterince beklemiş (ilk deneme veya RETRY_DELAY geçti)
+                c.execute(
+                    """
+                    SELECT id, sender, receiver, message_text, attempts
+                    FROM outgoing_queue
+                    WHERE status = 'pending'
+                      AND (last_attempt IS NULL OR (? - last_attempt) >= ?)
+                    ORDER BY queued_at ASC
+                    LIMIT 10
+                    """,
+                    (now, RETRY_DELAY)
+                )
+                rows = c.fetchall()
+
+                for row in rows:
+                    qid, sender, receiver, msg_text, attempts = row
+                    target_padded = receiver.ljust(9)[:9]
+                    pkt_raw = f"{sender}>APRS,TCPIP*::{target_padded}:{msg_text}"
+
+                    success = False
+                    try:
+                        AIS.sendall(pkt_raw)
+                        success = True
+                        print(f"✅ Kuyruk Gönderildi [{qid}]: {pkt_raw}")
+                    except Exception as e:
+                        print(f"❌ Kuyruk Gönderim Hatası [{qid}]: {e}")
+
+                    if success:
+                        c.execute(
+                            "UPDATE outgoing_queue SET status='sent', sent_at=?, last_attempt=? WHERE id=?",
+                            (now, now, qid)
+                        )
+                    else:
+                        new_attempts = attempts + 1
+                        new_status   = 'failed' if new_attempts >= MAX_ATTEMPTS else 'pending'
+                        c.execute(
+                            "UPDATE outgoing_queue SET attempts=?, last_attempt=?, status=? WHERE id=?",
+                            (new_attempts, now, new_status, qid)
+                        )
+
+                # Eski 'sent'/'failed' kayıtları temizle (24 saat sonra)
+                c.execute(
+                    "DELETE FROM outgoing_queue WHERE status IN ('sent','failed') AND queued_at < ?",
+                    (now - 86400,)
+                )
+
+                conn.commit()
+                conn.close()
+        except Exception as e:
+            print(f"message_sender_task hatası: {e}")
+
+        eventlet.sleep(5)  # Her 5 saniyede bir kontrol et
 
 def haversine_distance(lat1, lon1, lat2, lon2):
     R = 6371.0  # Dünya yarıçapı (km)
@@ -636,48 +719,78 @@ def api_settings():
     tracked = cfg.get('tracked_callsigns', [])
     return json.dumps({"status": "success", "tracked_callsigns": tracked})
 
+@app.route('/api/queue')
+@login_required
+def api_queue():
+    """Giden mesaj kuyruğunu döndür"""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute(
+            """
+            SELECT id, sender, receiver, message_text, queued_at,
+                   status, attempts, last_attempt, sent_at
+            FROM outgoing_queue
+            ORDER BY queued_at DESC
+            LIMIT 50
+            """
+        )
+        rows = [dict(r) for r in c.fetchall()]
+        conn.close()
+        return json.dumps({"status": "success", "queue": rows})
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
 @socketio.on('send_message')
 def handle_send_message(data):
-    target = data.get('target', '')
-    msg = data.get('message', '')
+    target   = data.get('target', '').strip()
+    msg      = data.get('message', '').strip()
     callsign = data.get('callsign', '').strip()
-    
+
     if not target or not msg:
         return {"status": "error", "message": "Eksik bilgi"}
-    
-    my_call = callsign.upper() if callsign else config.get("aprs", {}).get("callsign", "N0CALL")
-    
-    # SADECE kendi ağımızdaki TCP istemcilerine gönder (Global APRS ağına gitmez)
-    target_padded = target.ljust(9)[:9]
-    packet_raw = f"{my_call}>APRS,TCPIP*::{target_padded}:{msg}"
-    
+
+    cfg     = load_config()
+    my_call = callsign.upper() if callsign else cfg.get("aprs", {}).get("callsign", "N0CALL")
+    now     = time.time()
+
     try:
-        now = time.time()
         conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
+        c    = conn.cursor()
+
+        # 1) Mesaj geçmişine kaydet (chat paneli için)
         c.execute(
             "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
             (my_call, target, msg, now)
         )
+
+        # 2) Giden kuyruğa ekle (sayfa kapalı olsa bile APRS-IS'e gider)
+        c.execute(
+            "INSERT INTO outgoing_queue (sender, receiver, message_text, queued_at) VALUES (?, ?, ?, ?)",
+            (my_call, target, msg, now)
+        )
+
         conn.commit()
         conn.close()
-        # SADECE Socket.IO istemcilerine özel mesaj olarak dağıt (Web/Mobil)
+
+        # 3) Bağlı web istemcilerine anlık göster (Socket.IO)
         packet_parsed = {
-            "from": my_call,
-            "addresse": target,
-            "format": "message",
+            "from":         my_call,
+            "addresse":     target,
+            "format":       "message",
             "message_text": msg,
-            "timestamp": now
+            "timestamp":    now
         }
         socketio.emit('aprs_packet', packet_parsed)
-        
-        # TCP İstemcilere yankılamıyoruz (IGate'ler veya APRSDroid). 
-        # Çünkü IGate'ler bu paketi alıp aprs.fi'ye yönlendirebilir.
-        
-        print(f"Özel Mesaj Gönderildi (Sadece Socket.IO): {packet_raw}")
-        return {"status": "success", "packet": packet_raw}
+
+        target_padded = target.ljust(9)[:9]
+        packet_raw    = f"{my_call}>APRS,TCPIP*::{target_padded}:{msg}"
+        print(f"📥 Kuyruğa eklendi → {packet_raw}")
+        return {"status": "success", "packet": packet_raw, "queued": True}
+
     except Exception as e:
-        print(f"Mesaj Gönderim Hatası: {e}")
+        print(f"Mesaj Kuyruk Hatası: {e}")
         return {"status": "error", "message": str(e)}
 
 @socketio.on('private_location')
@@ -728,8 +841,9 @@ if __name__ == "__main__":
     port = int(config.get("web", {}).get("port", 6061))
     print(f"Web sunucusu başlatılıyor: http://0.0.0.0:{port}")
     
-    # Arka plan görevini başlat (eventlet thread)
+    # Arka plan görevlerini başlat (eventlet thread)
     eventlet.spawn(aprs_listener)
     eventlet.spawn(aprs_tcp_server)
+    eventlet.spawn(message_sender_task)  # ✔ Giden mesaj kuyruğu göndericisi
     
     socketio.run(app, host="0.0.0.0", port=port, debug=False)
