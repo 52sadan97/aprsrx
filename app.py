@@ -264,9 +264,10 @@ KORGAN_LAT  = 40.822
 KORGAN_LON  = 37.346
 KORGAN_R_KM = 5.0
 
-# Fatsa koordinatları ve hoşgeldin yarıçapı
-FATSA_LAT  = 40.9215
-FATSA_LON  = 37.5043
+# FATSA Koordinat ve Yarıçap (Hoşgeldin Mesajı)
+# Doğru sahil merkezi
+FATSA_LAT = 41.0325
+FATSA_LON = 37.5000
 FATSA_R_KM = 7.0
 
 # Ordu bölgesi geniş harita filtre merkezi ve yarıçapı
