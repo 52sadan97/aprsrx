@@ -13,6 +13,7 @@ import time
 import sqlite3
 import threading
 import datetime
+import traceback
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371  # Dünya yarıçapı (km)
@@ -174,7 +175,9 @@ def message_sender_task():
     """
     global AIS
     MAX_ATTEMPTS = 5
-    RETRY_DELAY  = 30  # saniye — başarısız sonrası bekleme
+    RETRY_DELAY  = 60  # saniye — başarısız denemeler arası bekleme
+
+    print("📤 message_sender_task başlatıldı")
 
     while True:
         try:
@@ -183,7 +186,8 @@ def message_sender_task():
                 conn = sqlite3.connect(DB_FILE)
                 c    = conn.cursor()
 
-                # 'pending' + yeterince beklemiş (ilk deneme veya RETRY_DELAY geçti)
+                # İlk deneme (last_attempt IS NULL) → hemen gönder
+                # Başarısız denemeler → RETRY_DELAY sonra tekrar
                 c.execute(
                     """
                     SELECT id, sender, receiver, message_text, attempts
@@ -209,6 +213,7 @@ def message_sender_task():
                         print(f"✅ Kuyruk Gönderildi [{qid}]: {pkt_raw}")
                     except Exception as e:
                         print(f"❌ Kuyruk Gönderim Hatası [{qid}]: {e}")
+                        traceback.print_exc()
 
                     if success:
                         c.execute(
@@ -233,6 +238,7 @@ def message_sender_task():
                 conn.close()
         except Exception as e:
             print(f"message_sender_task hatası: {e}")
+            traceback.print_exc()
 
         eventlet.sleep(5)  # Her 5 saniyede bir kontrol et
 
