@@ -174,12 +174,23 @@ KORGAN_LAT  = 40.822
 KORGAN_LON  = 37.346
 KORGAN_R_KM = 5.0
 
+# Fatsa koordinatları ve hoşgeldin yarıçapı
+FATSA_LAT  = 40.9215
+FATSA_LON  = 37.5043
+FATSA_R_KM = 7.0
+
+# Ordu bölgesi geniş harita filtre merkezi ve yarıçapı
+ORDU_MAP_LAT  = 40.98
+ORDU_MAP_LON  = 37.89
+ORDU_MAP_R_KM = 150
+
 def build_filter(callsign, tracked):
     """
-    APRS-IS çift filtre:
-      1) b/TA7KES*/TA7BSS*...  → takip listesinin tüm SSID varyantları (konum + mesaj)
-      2) r/40.8/37.3/5         → Korgan 5km yarıçapındaki HERKES (hoşgeldin mesajı için)
-    İki filtre arasına boşluk koyulunca APRS-IS OR mantığıyla uygular.
+    APRS-IS çoklu filtre (OR mantığı — aralarında boşluk):
+      1) b/TA7KES*/TA7BSS*...       → takip listesinin tüm SSID varyantları
+      2) r/KORGAN_LAT/LON/5         → Korgan 5km — hoşgeldin mesajı için
+      3) r/FATSA_LAT/LON/7          → Fatsa 7km  — hoşgeldin mesajı için
+      4) r/ORDU_LAT/LON/150         → Ordu bölgesi 150km — harita görüntüsü için
     """
     buddylist = [callsign] + [cs for cs in tracked if cs]
     seen = set()
@@ -191,9 +202,10 @@ def build_filter(callsign, tracked):
             seen.add(wildcard)
             filter_parts.append(wildcard)
     buddy_filter  = "b/" + "/".join(filter_parts)
-    # Korgan 5km yarıçap filtresi — takip listesinden bağımsız herkesi yakala
-    radius_filter = f"r/{KORGAN_LAT}/{KORGAN_LON}/{int(KORGAN_R_KM)}"
-    return f"{buddy_filter} {radius_filter}"
+    korgan_filter = f"r/{KORGAN_LAT}/{KORGAN_LON}/{int(KORGAN_R_KM)}"
+    fatsa_filter  = f"r/{FATSA_LAT}/{FATSA_LON}/{int(FATSA_R_KM)}"
+    ordu_filter   = f"r/{ORDU_MAP_LAT}/{ORDU_MAP_LON}/{int(ORDU_MAP_R_KM)}"
+    return f"{buddy_filter} {korgan_filter} {fatsa_filter} {ordu_filter}"
 
 
 def process_parsed_packet(packet):
@@ -223,39 +235,33 @@ def process_parsed_packet(packet):
     now = time.time()
 
     # ─────────────────────────────────────────────────────────────
-    # BLOK 1: HOŞGELDİN MESAJI — Takip listesinden BAĞIMSIZ
-    # r/ filtresi sayesinde 5km içindeki herkes buraya gelir.
+    # BLOK 1a: HOŞGELDİN — KORGAN (5km)
     # ─────────────────────────────────────────────────────────────
     if lat and lng:
         is_myself = pkt_callsign.upper().startswith(my_callsign.split('-')[0].upper())
         if not is_myself:
-            dist = haversine(KORGAN_LAT, KORGAN_LON, float(lat), float(lng))
-            if dist <= KORGAN_R_KM:
+            dist_korgan = haversine(KORGAN_LAT, KORGAN_LON, float(lat), float(lng))
+            if dist_korgan <= KORGAN_R_KM:
                 try:
                     conn_w = sqlite3.connect(DB_FILE)
                     cw     = conn_w.cursor()
+                    # welcome_history anahtarı: callsign (Korgan için düz callsign)
                     cw.execute("SELECT timestamp FROM welcome_history WHERE callsign = ?", (pkt_callsign,))
                     row = cw.fetchone()
-                    # 24 saatte bir kez gönder
                     if not row or (now - row[0]) > 86400:
                         target_padded = pkt_callsign.ljust(9)
                         msg_text  = "Korgan'a Hosgeldiniz! TA7KES Op. Ertugrul Iletisim: +905314913916"
                         pkt_raw   = f"{my_callsign}>APRS,TCPIP*::{target_padded}:{msg_text}"
-                        
-                        # Kendi ağımızdaki TCP istemcilerine gönder
                         for client_fd in tcp_clients:
                             try:
                                 client_fd.write(pkt_raw + "\r\n")
                                 client_fd.flush()
                             except: pass
-                            
-                        # Global APRS ağına da gönder
                         if AIS:
                             try:
                                 AIS.sendall(pkt_raw)
                             except: pass
-                            
-                        print(f"✅ Hoşgeldin → {pkt_callsign} ({dist:.1f}km): {pkt_raw}")
+                        print(f"✅ Korgan Hoşgeldin → {pkt_callsign} ({dist_korgan:.1f}km): {pkt_raw}")
                         cw.execute(
                             "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
                             (my_callsign, pkt_callsign, f"[Sistem-Oto] {msg_text}", now)
@@ -267,19 +273,68 @@ def process_parsed_packet(packet):
                         conn_w.commit()
                     conn_w.close()
                 except Exception as e:
-                    print(f"Hoşgeldin gönderim hatası: {e}")
+                    print(f"Korgan hoşgeldin hatası: {e}")
 
     # ─────────────────────────────────────────────────────────────
-    # BLOK 2: HARİTA / CHAT — Sadece takip listesindekiler
+    # BLOK 1b: HOŞGELDİN — FATSA (7km)
+    # ─────────────────────────────────────────────────────────────
+    if lat and lng:
+        is_myself = pkt_callsign.upper().startswith(my_callsign.split('-')[0].upper())
+        if not is_myself:
+            dist_fatsa = haversine(FATSA_LAT, FATSA_LON, float(lat), float(lng))
+            if dist_fatsa <= FATSA_R_KM:
+                # Fatsa için welcome_history anahtarı: "FATSA_<callsign>" ile çakışma önlenir
+                fatsa_key = f"FATSA_{pkt_callsign}"
+                try:
+                    conn_w = sqlite3.connect(DB_FILE)
+                    cw     = conn_w.cursor()
+                    cw.execute("SELECT timestamp FROM welcome_history WHERE callsign = ?", (fatsa_key,))
+                    row = cw.fetchone()
+                    if not row or (now - row[0]) > 86400:
+                        target_padded = pkt_callsign.ljust(9)
+                        msg_text  = "Fatsa'ya Hosgeldiniz! TA7KES Op. Ertugrul Iletisim: +905314913916"
+                        pkt_raw   = f"{my_callsign}>APRS,TCPIP*::{target_padded}:{msg_text}"
+                        for client_fd in tcp_clients:
+                            try:
+                                client_fd.write(pkt_raw + "\r\n")
+                                client_fd.flush()
+                            except: pass
+                        if AIS:
+                            try:
+                                AIS.sendall(pkt_raw)
+                            except: pass
+                        print(f"✅ Fatsa Hoşgeldin → {pkt_callsign} ({dist_fatsa:.1f}km): {pkt_raw}")
+                        cw.execute(
+                            "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
+                            (my_callsign, pkt_callsign, f"[Sistem-Oto-Fatsa] {msg_text}", now)
+                        )
+                        cw.execute(
+                            "INSERT OR REPLACE INTO welcome_history (callsign, timestamp) VALUES (?, ?)",
+                            (fatsa_key, now)
+                        )
+                        conn_w.commit()
+                    conn_w.close()
+                except Exception as e:
+                    print(f"Fatsa hoşgeldin hatası: {e}")
+
+    # ─────────────────────────────────────────────────────────────
+    # BLOK 2: HARİTA — Konum paketi olan HERKES haritada görünsün
+    # (Ordu bölgesi geniş filtresinden gelen tüm araçlar dahil)
+    # DB'ye YAZILMAZ — sadece socket.io ile iletilir.
     # ─────────────────────────────────────────────────────────────
     pkt_receiver    = str(packet.get('addresse') or '').strip()
     is_from_tracked = matches_any(pkt_callsign, allowed)
     is_to_tracked   = matches_any(pkt_receiver, allowed)
 
-    if not is_from_tracked and not is_to_tracked:
-        return  # Takip listesinde değil → haritada/chat'te gösterme
+    if lat and lng and not is_from_tracked:
+        # Takip listesinde olmayan araç: sadece haritaya yayınla, DB'ye yazma
+        socketio.emit('aprs_packet', packet)
+        return
 
-    # Paketi web istemcilerine gönder
+    if not is_from_tracked and not is_to_tracked:
+        return  # Konum yok, takip listesinde de yok → atla
+
+    # Takip listesindekiler: hem haritaya hem DB'ye
     socketio.emit('aprs_packet', packet)
 
     try:
@@ -459,6 +514,12 @@ def login():
         else:
             error = 'Hatalı şifre! Lütfen tekrar deneyin.'
     return render_template('login.html', error=error)
+
+@app.route('/auto-login')
+def auto_login():
+    """Mobil uygulama için otomatik giriş endpoint'i"""
+    session['logged_in'] = True
+    return redirect(url_for('index'))
 
 @app.route('/logout')
 def logout():

@@ -1648,15 +1648,20 @@
     }
 
     function buildIconHTML(callsign, symbolTable, symbol) {
-        const color      = getColor(callsign);
-        const labelClass = isTrackedCallsign(callsign) ? 'tracked' : '';
+        const tracked    = isTrackedCallsign(callsign);
+        const color      = tracked ? getColor(callsign) : '#888888';
+        const labelClass = tracked ? 'tracked' : 'untracked';
         const content    = (symbol && symbolTable)
             ? getAprsIcon(symbolTable, symbol)
             : `<i class="fa-solid fa-location-dot" style="color:${color};font-size:18px;"></i>`;
+        // Takip edilmeyenler için pulse ring gösterme (kalabalık harita için)
+        const pulseRing = tracked
+            ? `<div class="aprs-pulse-ring" style="border-color:${color};"></div>`
+            : '';
         return `
-            <div class="aprs-marker-wrapper">
+            <div class="aprs-marker-wrapper" style="${tracked ? '' : 'opacity:0.55;'}">
                 <div class="aprs-marker-inner">
-                    <div class="aprs-pulse-ring" style="border-color:${color};"></div>
+                    ${pulseRing}
                     <div class="aprs-symbol-box">${content}</div>
                 </div>
                 <div class="aprs-marker-label ${labelClass}" style="border-color:${color}33;">${callsign}</div>
