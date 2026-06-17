@@ -484,6 +484,9 @@ def process_parsed_packet(packet):
                     msg_text = f"❌ [Reddedildi - REJ] Mesaj No: {msg_no}"
                 else:
                     msg_text = f"[Sistem: {resp}]"
+                    
+            if receiver.upper().startswith('TA7KES'):
+                send_telegram_notification(f"✉️ TA7KES'e Yeni Mesaj\nKimden: {pkt_callsign}\nMesaj: {msg_text}")
 
             c.execute(
                 "INSERT INTO message_history (sender, receiver, message_text, timestamp) VALUES (?, ?, ?, ?)",
