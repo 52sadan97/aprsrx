@@ -150,9 +150,10 @@ def db_cleanup_task():
             c.execute(f"DELETE FROM location_history WHERE timestamp < ? AND ({loc_like_clauses})", [thirty_days_ago] + params)
             c.execute(f"DELETE FROM message_history WHERE timestamp < ? AND ({msg_like_clauses})", [thirty_days_ago] + params)
             
-            # Diğer herkes için 2 saatlik temizlik
-            c.execute(f"DELETE FROM location_history WHERE timestamp < ? AND NOT ({loc_like_clauses})", [two_hours_ago] + params)
-            c.execute(f"DELETE FROM message_history WHERE timestamp < ? AND NOT ({msg_like_clauses})", [two_hours_ago] + params)
+            # Diğer herkes için 24 saatlik temizlik
+            twenty_four_hours_ago = now - (24 * 60 * 60)
+            c.execute(f"DELETE FROM location_history WHERE timestamp < ? AND NOT ({loc_like_clauses})", [twenty_four_hours_ago] + params)
+            c.execute(f"DELETE FROM message_history WHERE timestamp < ? AND NOT ({msg_like_clauses})", [twenty_four_hours_ago] + params)
             
             # Welcome geçmişini temizle (24 saat)
             twenty_four_hours_ago = now - (24 * 60 * 60)
@@ -407,30 +408,25 @@ def process_parsed_packet(packet):
                     print(f"Fatsa hoşgeldin hatası: {e}")
 
     # ─────────────────────────────────────────────────────────────
-    # BLOK 2: HARİTA — Konum paketi olan HERKES haritada görünsün
+    # BLOK 2: HARİTA — Konum paketi olan HERKES haritada görünsün ve DB'ye yazılsın
     # (Ordu bölgesi geniş filtresinden gelen tüm araçlar dahil)
-    # DB'ye YAZILMAZ — sadece socket.io ile iletilir.
     # ─────────────────────────────────────────────────────────────
     pkt_receiver    = str(packet.get('addresse') or '').strip()
     is_from_tracked = matches_any(pkt_callsign, allowed)
     is_to_tracked   = matches_any(pkt_receiver, allowed)
 
-    if lat and lng and not is_from_tracked:
-        # Takip listesinde olmayan araç: sadece haritaya yayınla, DB'ye yazma
-        socketio.emit('aprs_packet', packet)
+    # İlgisiz paketleri atla (Konum yok ve bizimle ilgili değilse)
+    if not lat and not lng and not is_from_tracked and not is_to_tracked:
         return
 
-    if not is_from_tracked and not is_to_tracked:
-        return  # Konum yok, takip listesinde de yok → atla
-
-    # Takip listesindekiler: hem haritaya hem DB'ye
+    # Herkese (konumu olan veya bizimle ilgili olan) paketi gönder
     socketio.emit('aprs_packet', packet)
 
     try:
         conn = sqlite3.connect(DB_FILE)
         c    = conn.cursor()
 
-        # KONUM LOGLA (sadece takip listesindekiler)
+        # KONUM LOGLA (herkes için, 24 saat saklanacak)
         if lat and lng:
             comment = packet.get('comment', '')
             speed   = packet.get('speed')
@@ -648,45 +644,47 @@ def api_history():
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         
-        # URL'den date parametresini al (YYYY-MM-DD)
+        # Zaman parametreleri: hours ve date
+        hours_str = request.args.get('hours', 'all')
         date_str = request.args.get('date')
-        if date_str:
-            try:
-                dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-                start_ts = dt.timestamp()
-                end_ts = start_ts + 86400
-            except ValueError:
-                now = datetime.datetime.now()
-                dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                start_ts = dt.timestamp()
-                end_ts = start_ts + 86400
-        else:
-            now = datetime.datetime.now()
-            dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            start_ts = dt.timestamp()
-            end_ts = start_ts + 86400
-            
-        # Sadece takip edilenleri getir
-        cfg = load_config()
-        my_call = cfg.get("aprs", {}).get("callsign", "NOCALL")
-        tracked = cfg.get('tracked_callsigns', [])
-        important_calls = [my_call] + tracked
         
-        loc_like_clauses = " OR ".join(["callsign LIKE ?"] * len(important_calls))
-        msg_like_clauses = " OR ".join(["sender LIKE ?"] * len(important_calls))
-        params = [f"{cs}%" for cs in important_calls]
+        now = time.time()
+        
+        if hours_str != 'all':
+            try:
+                h = float(hours_str)
+                end_ts = now
+                start_ts = end_ts - (h * 3600)
+            except ValueError:
+                # Fallback to date_str logic below if hours is invalid
+                hours_str = 'all'
+                
+        if hours_str == 'all':
+            if date_str:
+                try:
+                    dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+                    start_ts = dt.timestamp()
+                    end_ts = start_ts + 86400
+                except ValueError:
+                    dt = datetime.datetime.fromtimestamp(now).replace(hour=0, minute=0, second=0, microsecond=0)
+                    start_ts = dt.timestamp()
+                    end_ts = start_ts + 86400
+            else:
+                dt = datetime.datetime.fromtimestamp(now).replace(hour=0, minute=0, second=0, microsecond=0)
+                start_ts = dt.timestamp()
+                end_ts = start_ts + 86400
         
         c.execute(
             f"SELECT callsign, lat, lon, comment, timestamp, symbol, symbol_table FROM location_history "
-            f"WHERE timestamp >= ? AND timestamp < ? AND ({loc_like_clauses}) ORDER BY timestamp ASC",
-            [start_ts, end_ts] + params
+            f"WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp ASC",
+            (start_ts, end_ts)
         )
         locations = [dict(row) for row in c.fetchall()]
         
         c.execute(
             f"SELECT sender, receiver, message_text, timestamp FROM message_history "
-            f"WHERE timestamp >= ? AND timestamp < ? AND ({msg_like_clauses}) ORDER BY timestamp ASC",
-            [start_ts, end_ts] + params
+            f"WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp ASC",
+            (start_ts, end_ts)
         )
         messages = [dict(row) for row in c.fetchall()]
         

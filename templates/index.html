@@ -1016,6 +1016,14 @@
     <!-- Desktop Controls -->
     <div class="nav-desktop-controls">
         <input type="date" id="historyDate" class="nav-input" title="Tarih Seçin">
+        <select id="timeFilter" class="nav-input" title="Zaman Filtresi">
+            <option value="1">Son 1 Saat</option>
+            <option value="2">Son 2 Saat</option>
+            <option value="6">Son 6 Saat</option>
+            <option value="12">Son 12 Saat</option>
+            <option value="24">Son 24 Saat</option>
+            <option value="all" selected>Tüm Gün</option>
+        </select>
         <select id="callsignFilter" class="nav-input" title="Araç Filtrele">
             <option value="ALL">Tüm Araçlar</option>
         </select>
@@ -1052,6 +1060,18 @@
     <div class="mobile-menu-group">
         <label><i class="fa-solid fa-calendar-day"></i> Tarih</label>
         <input type="date" id="historyDateMobile" class="nav-input">
+    </div>
+
+    <div class="mobile-menu-group">
+        <label><i class="fa-solid fa-clock"></i> Zaman</label>
+        <select id="timeFilterMobile" class="nav-input">
+            <option value="1">Son 1 Saat</option>
+            <option value="2">Son 2 Saat</option>
+            <option value="6">Son 6 Saat</option>
+            <option value="12">Son 12 Saat</option>
+            <option value="24">Son 24 Saat</option>
+            <option value="all" selected>Tüm Gün</option>
+        </select>
     </div>
 
     <div class="mobile-menu-group">
@@ -1094,6 +1114,17 @@
     <div class="float-control">
         <label><i class="fa-solid fa-calendar-day"></i></label>
         <input type="date" id="historyDateFloat">
+    </div>
+    <div class="float-control" style="width: 80px;">
+        <label><i class="fa-solid fa-clock"></i></label>
+        <select id="timeFilterFloat" style="padding: 6px 4px; font-size: 12px;">
+            <option value="1">1S</option>
+            <option value="2">2S</option>
+            <option value="6">6S</option>
+            <option value="12">12S</option>
+            <option value="24">24S</option>
+            <option value="all" selected>Tüm</option>
+        </select>
     </div>
     <div class="float-control">
         <label><i class="fa-solid fa-filter"></i></label>
@@ -1335,6 +1366,11 @@
         document.getElementById('historyDateMobile').value = value;
         document.getElementById('historyDateFloat').value = value;
     }
+    function syncTimeControls(value) {
+        document.getElementById('timeFilter').value = value;
+        document.getElementById('timeFilterMobile').value = value;
+        document.getElementById('timeFilterFloat').value = value;
+    }
     function syncFilterControls(value) {
         document.getElementById('callsignFilter').value = value;
         document.getElementById('callsignFilterMobile').value = value;
@@ -1345,7 +1381,15 @@
     ['historyDate', 'historyDateMobile', 'historyDateFloat'].forEach(id => {
         document.getElementById(id).addEventListener('change', e => {
             syncDateControls(e.target.value);
-            loadHistory(e.target.value);
+            loadHistory(e.target.value, document.getElementById('timeFilter').value);
+        });
+    });
+
+    // Time filter listeners
+    ['timeFilter', 'timeFilterMobile', 'timeFilterFloat'].forEach(id => {
+        document.getElementById(id).addEventListener('change', e => {
+            syncTimeControls(e.target.value);
+            loadHistory(document.getElementById('historyDate').value, e.target.value);
         });
     });
     // Filter listeners
@@ -1800,9 +1844,10 @@
     }
 
     // ─── History ──────────────────────────────────────────────────────────────
-    async function loadHistory(dateStr) {
+    async function loadHistory(dateStr, hours) {
         let url = '/api/history?t=' + Date.now();
         if (dateStr) url += '&date=' + dateStr;
+        if (hours) url += '&hours=' + hours;
 
         // Clear map
         Object.values(markers).forEach(m => map.removeLayer(m));
@@ -1876,7 +1921,7 @@
         const offset = today.getTimezoneOffset() * 60000;
         const localISOTime = (new Date(today - offset)).toISOString().split('T')[0];
         syncDateControls(localISOTime);
-        loadHistory(localISOTime);
+        loadHistory(localISOTime, document.getElementById('timeFilter').value);
 
         // Kullanıcı sayfayla etkileşime geçtiğinde bildirim izni iste ve sesi aktifleştir
         let hasInteracted = false;
