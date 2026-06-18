@@ -2,6 +2,7 @@
     "aprs": {
         "callsign": "NOCALL",
         "passcode": "-1",
+        "auto_welcome": true,
         "server": "euro.aprs2.net",
         "port": 14580,
         "filter": "r/40.8/37.3/200",

@@ -343,20 +343,26 @@ def process_parsed_packet(packet):
     now = time.time()
 
     # ─────────────────────────────────────────────────────────────
-    # BLOK 1a: HOŞGELDİN — KORGAN (5km)
+    # BLOK 1: HOŞGELDİN MESAJLARI (Otomatik)
     # ─────────────────────────────────────────────────────────────
-    if lat and lng:
+    # Ayarlardan auto_welcome kontrolü
+    auto_welcome = cfg_now.get("aprs", {}).get("auto_welcome", True)
+    
+    if auto_welcome and lat and lng:
         is_myself = pkt_callsign.upper().startswith(my_callsign.split('-')[0].upper())
         if not is_myself:
+            # ─────────────────────────────────────────────────────────────
+            # BLOK 1a: HOŞGELDİN — KORGAN (5km)
+            # ─────────────────────────────────────────────────────────────
             dist_korgan = haversine(KORGAN_LAT, KORGAN_LON, float(lat), float(lng))
             if dist_korgan <= KORGAN_R_KM:
                 try:
                     conn_w = sqlite3.connect(DB_FILE)
                     cw     = conn_w.cursor()
-                    # welcome_history anahtarı: callsign (Korgan için düz callsign)
+                    # Sadece 1 kez göndermek için: timestamp'e bakılmaksızın kayıt var mı kontrolü
                     cw.execute("SELECT timestamp FROM welcome_history WHERE callsign = ?", (pkt_callsign,))
                     row = cw.fetchone()
-                    if not row or (now - row[0]) > 86400:
+                    if not row:
                         target_padded = pkt_callsign.ljust(9)
                         msg_text  = "Korgan'a Hosgeldiniz! TA7KES Op. Ertugrul Iletisim: +905314913916"
                         pkt_raw   = f"{my_callsign}>APRS,TCPIP*::{target_padded}:{msg_text}"
@@ -384,12 +390,9 @@ def process_parsed_packet(packet):
                 except Exception as e:
                     print(f"Korgan hoşgeldin hatası: {e}")
 
-    # ─────────────────────────────────────────────────────────────
-    # BLOK 1b: HOŞGELDİN — FATSA (7km)
-    # ─────────────────────────────────────────────────────────────
-    if lat and lng:
-        is_myself = pkt_callsign.upper().startswith(my_callsign.split('-')[0].upper())
-        if not is_myself:
+            # ─────────────────────────────────────────────────────────────
+            # BLOK 1b: HOŞGELDİN — FATSA (7km)
+            # ─────────────────────────────────────────────────────────────
             dist_fatsa = haversine(FATSA_LAT, FATSA_LON, float(lat), float(lng))
             if dist_fatsa <= FATSA_R_KM:
                 # Fatsa için welcome_history anahtarı: "FATSA_<callsign>" ile çakışma önlenir
@@ -399,7 +402,7 @@ def process_parsed_packet(packet):
                     cw     = conn_w.cursor()
                     cw.execute("SELECT timestamp FROM welcome_history WHERE callsign = ?", (fatsa_key,))
                     row = cw.fetchone()
-                    if not row or (now - row[0]) > 86400:
+                    if not row:
                         target_padded = pkt_callsign.ljust(9)
                         msg_text  = "Fatsa'ya Hosgeldiniz! TA7KES Op. Ertugrul Iletisim: +905314913916"
                         pkt_raw   = f"{my_callsign}>APRS,TCPIP*::{target_padded}:{msg_text}"
@@ -727,10 +730,16 @@ def api_settings():
     cfg = load_config()
     if request.method == 'POST':
         data = request.json
-        if data and 'tracked_callsigns' in data:
-            # Temizle ve kaydet (kullanıcı * koymuşsa temizle)
-            callsigns = [cs.strip().upper().replace('*', '') for cs in data['tracked_callsigns'] if cs.strip()]
-            cfg['tracked_callsigns'] = callsigns
+        if data is not None:
+            if 'tracked_callsigns' in data:
+                # Temizle ve kaydet (kullanıcı * koymuşsa temizle)
+                callsigns = [cs.strip().upper().replace('*', '') for cs in data['tracked_callsigns'] if cs.strip()]
+                cfg['tracked_callsigns'] = callsigns
+            if 'auto_welcome' in data:
+                if "aprs" not in cfg:
+                    cfg["aprs"] = {}
+                cfg["aprs"]["auto_welcome"] = bool(data["auto_welcome"])
+                
             save_config(cfg)
             
             # Ayarların etkili olması için 1 saniye sonra sistemi yeniden başlat
@@ -744,7 +753,8 @@ def api_settings():
     
     # GET isteği: Mevcut ayarları döndür
     tracked = cfg.get('tracked_callsigns', [])
-    return json.dumps({"status": "success", "tracked_callsigns": tracked})
+    auto_welcome = cfg.get("aprs", {}).get("auto_welcome", True)
+    return json.dumps({"status": "success", "tracked_callsigns": tracked, "auto_welcome": auto_welcome})
 
 @app.route('/api/queue')
 @login_required
